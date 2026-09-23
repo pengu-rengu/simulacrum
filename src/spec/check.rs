@@ -1,7 +1,10 @@
 use crate::spec::spec::{check_next_state, check_flush_state};
 use crate::state::state::{State, Agent, Node};
 use crate::impl_::next_state::{flush_state, next_state};
-use std::iter::zip;
+use std::{
+    iter::zip,
+    collections::HashSet,
+};
 
 fn mock_states() -> Vec<State> {
     let contents = ["hi", "", "line1\nline2", "with \"quotes\""];
@@ -63,6 +66,21 @@ fn mock_input_strs() -> Vec<String> {
 
 fn assumptions(state: &State) {
     assert!(state.agents.len() > 0);
+    assert!(state.agent_idx < state.agents.len());
+    assert!(state.nodes.len() > 0);
+
+    for agent in &state.agents {
+        assert!(agent.node_idx < state.nodes.len());
+        for message in &agent.node_messages_inbox {
+            assert!(message.sender_agent_idx < state.agents.len());
+        }
+    }
+
+    let agent_names  = state.agents.iter().map(|agent| &agent.name).collect::<HashSet<&String>>();
+    assert_eq!(agent_names.len(), state.agents.len());
+
+    let node_names = state.nodes.iter().map(|node| &node.name).collect::<HashSet<&String>>();
+    assert_eq!(node_names.len(), state.nodes.len());
 }
 
 pub fn check() {

@@ -15,3 +15,4 @@ Unless i tell you otherwise, follow these rules:
 - maximum of 500 LOC per file, except for spec/check.rs which can be as large as needed
 
 If you think something is inconsistent/wrong with the spec, say so.
+Unless i say otherwise, if i say "commit", always commit all changes.
