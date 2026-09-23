@@ -1,5 +1,5 @@
 use crate::spec::spec::{check_next_state, check_flush_state};
-use crate::state::state::{State, Agent, Node};
+use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell};
 use crate::impl_::next_state::{flush_state, next_state};
 use std::{
     iter::zip,
@@ -27,12 +27,28 @@ fn mock_states() -> Vec<State> {
                             } else {
                                 None
                             },
+                            body_grid: {
+                                let width = 1 + a % 3;
+                                let height = 1 + (a + shift) % 2;
+                                BodyGrid {
+                                    width,
+                                    height,
+                                    cells: (0..width * height).map(|cell_idx| match (a + cell_idx) % 3 {
+                                        0 => BodyCell::CoreCell { health: 5 + a },
+                                        1 => BodyCell::CoreCell { health: 0 },
+                                        _ => BodyCell::EmptyCell,
+                                    }).collect(),
+                                }
+                            },
                         }).collect();
                         base_states.push(State {
                             turn: num_agents + shift,
                             agent_idx,
                             agents,
-                            nodes: (0..num_nodes).map(|n| Node { name: format!("Node{n}") }).collect(),
+                            nodes: (0..num_nodes).map(|n| Node {
+                                name: format!("Node{n}"),
+                                biome: "Amberwood thicket".to_string(),
+                            }).collect(),
                         });
                     }
                 }
@@ -71,6 +87,7 @@ fn assumptions(state: &State) {
 
     for agent in &state.agents {
         assert!(agent.node_idx < state.nodes.len());
+        assert_eq!(agent.body_grid.cells.len(), agent.body_grid.width * agent.body_grid.height);
         for message in &agent.node_messages_inbox {
             assert!(message.sender_agent_idx < state.agents.len());
         }

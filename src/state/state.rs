@@ -5,7 +5,21 @@ pub struct Agent {
     pub name: String,
     pub node_idx: usize,
     pub node_messages_inbox: Vec<Message>,
-    pub error_message: Option<String>
+    pub error_message: Option<String>,
+    pub body_grid: BodyGrid
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum BodyCell {
+    CoreCell { health: usize },
+    EmptyCell
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct BodyGrid {
+    pub width: usize,
+    pub height: usize,
+    pub cells: Vec<BodyCell>
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -16,7 +30,8 @@ pub struct Message {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Node {
-    pub name: String
+    pub name: String,
+    pub biome: String
 }
 
 #[derive(Serialize, Deserialize, Clone)]

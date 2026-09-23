@@ -13,6 +13,12 @@ pub fn check_increment(old_state: &State, new_state: &State) {
     }
 }
 
+pub fn check_body_grids_unchanged(old_state: &State, new_state: &State) {
+    for (old_agent, new_agent) in zip(&old_state.agents, &new_state.agents) {
+        assert_eq!(old_agent.body_grid, new_agent.body_grid);
+    }
+}
+
 pub fn check_send_message(old_state: &State, new_state: &State, content: &str) {
     let curr_node_idx = old_state.agents[old_state.agent_idx].node_idx;
     for (old_agent, new_agent) in zip(&old_state.agents, &new_state.agents) {
@@ -33,6 +39,7 @@ pub fn check_send_message(old_state: &State, new_state: &State, content: &str) {
 
 pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
     check_increment(old_state, new_state);
+    check_body_grids_unchanged(old_state, new_state);
     let Ok(input) = from_str::<Input>(input_str) else {
         assert_eq!(new_state.agents[old_state.agent_idx].error_message, Some("could not parse input json".to_string()));
         return;
@@ -45,6 +52,7 @@ pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
 
 pub fn check_flush_state(old_state: &State, new_state: &State, output: &str) {
     assert_eq!(old_state.agent_idx, new_state.agent_idx);
+    check_body_grids_unchanged(old_state, new_state);
     let agent_idx = new_state.agent_idx;
     
     let mut lines = vec!["Messages:\n".to_string()];

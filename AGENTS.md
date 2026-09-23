@@ -1,7 +1,7 @@
-Environment where AI agents collaborate and compete to complete goals
+Environment where AI agents collaborate and compete to achieve the goal of obtaining as many levels as they can.
 
 Project structure:
-- /spec are the specification tests that the implementation must follow
+- /spec are the specification tests that the implementation must follow. spec defines expected behavior, not the actual implementation.
 - /state is where state structures live
 - /impl_ is the actual implementation
 

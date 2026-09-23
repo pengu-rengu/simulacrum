@@ -1,4 +1,12 @@
-use crate::state::state::{State, Agent, Node};
+use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell};
+
+fn initial_body_grid() -> BodyGrid {
+    BodyGrid {
+        width: 1,
+        height: 1,
+        cells: vec![BodyCell::CoreCell { health: 10 }],
+    }
+}
 
 impl State {
     pub fn new() -> State {
@@ -11,16 +19,19 @@ impl State {
                     node_idx: 0,
                     node_messages_inbox: vec![],
                     error_message: None,
+                    body_grid: initial_body_grid(),
                 },
                 Agent {
                     name: "Agent2".to_string(),
                     node_idx: 0,
                     node_messages_inbox: vec![],
-                    error_message: None
+                    error_message: None,
+                    body_grid: initial_body_grid()
                 },
             ],
             nodes: vec![Node {
-                name: "Node1".to_string()
+                name: "Node1".to_string(),
+                biome: "Amberwood thicket".to_string()
             }],
         }
     }
