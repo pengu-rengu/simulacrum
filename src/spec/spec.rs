@@ -1,4 +1,4 @@
-use crate::state::state::{State, Input, Action, Message, Item, ItemStack, PointOfInterest};
+use crate::state::state::{State, Input, Action, Message, Item, ItemStack, PointOfInterest, Menu, workbench_recipes};
 use serde_json::from_str;
 use std::iter::zip;
 
@@ -32,14 +32,13 @@ pub fn check_agents_idle(old_state: &State, new_state: &State, acting_agent_chan
         if acting_agent_changes && agent_idx == old_state.agent_idx { continue; }
         assert_eq!(old_agent.node_idx, new_agent.node_idx);
         assert_eq!(old_agent.inventory, new_agent.inventory);
+        assert_eq!(old_agent.open_menu, new_agent.open_menu);
     }
 }
 
 pub fn check_error_message(new_state: &State, acting_agent_idx: usize, expected: Option<&str>) {
-    assert_eq!(
-        new_state.agents[acting_agent_idx].error_message,
-        expected.map(|error_message| error_message.to_string())
-    );
+    let expected_error_msg = expected.map(|error_message| error_message.to_string());
+    assert_eq!(new_state.agents[acting_agent_idx].error_message, expected_error_msg);
 }
 
 /// The acting agent's inventory changed by exactly `deltas`, and nothing else moved or gained items.
@@ -80,6 +79,7 @@ pub fn check_move_to(old_state: &State, new_state: &State, node_name: &str) {
     }
 
     assert_eq!(old_state.agents[acting_agent_idx].inventory, new_state.agents[acting_agent_idx].inventory);
+    assert_eq!(new_state.agents[acting_agent_idx].open_menu, None);
     check_agents_idle(old_state, new_state, true);
 }
 
@@ -91,8 +91,15 @@ pub fn check_interact(old_state: &State, new_state: &State, poi_idx: usize) {
     let Some(poi) = pois.get(poi_idx) else {
         check_error_message(new_state, acting_agent_idx, Some(&format!("no poi at index {poi_idx}")));
         check_inventory_deltas(old_state, new_state, &[]);
+        assert_eq!(new_state.agents[acting_agent_idx].open_menu, None);
         return;
     };
+    
+    let expected_open_menu = match poi {
+        PointOfInterest::RuinedWorkbench => Some(Menu::Workbench),
+        _ => None,
+    };
+    assert_eq!(new_state.agents[acting_agent_idx].open_menu, expected_open_menu);
 
     match poi {
         PointOfInterest::Thornbush => {
@@ -116,26 +123,77 @@ pub fn check_interact(old_state: &State, new_state: &State, poi_idx: usize) {
                 check_inventory_deltas(old_state, new_state, &[]);
             }
         }
+        // opens the crafting menu: crafting itself is a separate action
         PointOfInterest::RuinedWorkbench => {
-            let enough_sticks = item_count(&acting_agent.inventory, &Item::Stick) >= 10;
-            let enough_pebbles = item_count(&acting_agent.inventory, &Item::SmoothPebble) >= 10;
-            if enough_sticks && enough_pebbles {
-                check_error_message(new_state, acting_agent_idx, None);
-                check_inventory_deltas(old_state, new_state, &[
-                    (Item::Stick, -10),
-                    (Item::SmoothPebble, -10),
-                    (Item::CrudePickaxe, 1),
-                ]);
-            } else {
-                check_error_message(
-                    new_state,
-                    acting_agent_idx,
-                    Some("need 10 stick and 10 smooth pebble to craft a crude pickaxe"),
-                );
-                check_inventory_deltas(old_state, new_state, &[]);
-            }
+            check_error_message(new_state, acting_agent_idx, None);
+            check_inventory_deltas(old_state, new_state, &[]);
         }
     }
+}
+
+pub fn check_craft(old_state: &State, new_state: &State, recipe_idx: usize) {
+    let acting_agent_idx = old_state.agent_idx;
+    let acting_agent = &old_state.agents[acting_agent_idx];
+
+    assert_eq!(new_state.agents[acting_agent_idx].open_menu, acting_agent.open_menu);
+
+    if acting_agent.open_menu != Some(Menu::Workbench) {
+        check_error_message(new_state, acting_agent_idx, Some("you are not at a workbench"));
+        check_inventory_deltas(old_state, new_state, &[]);
+        return;
+    }
+
+    let recipes = workbench_recipes();
+    let Some(recipe) = recipes.get(recipe_idx) else {
+        check_error_message(new_state, acting_agent_idx, Some(&format!("no recipe at index {recipe_idx}")));
+        check_inventory_deltas(old_state, new_state, &[]);
+        return;
+    };
+
+    let affordable = recipe.ingredients.iter()
+        .all(|ingredient| item_count(&acting_agent.inventory, &ingredient.item) >= ingredient.count);
+    if !affordable {
+        check_error_message(
+            new_state,
+            acting_agent_idx,
+            Some(&format!("not enough items to craft {:?}", recipe.output.item)),
+        );
+        check_inventory_deltas(old_state, new_state, &[]);
+        return;
+    }
+
+    let mut deltas = recipe.ingredients.iter()
+        .map(|ingredient| (ingredient.item.clone(), -(ingredient.count as i64)))
+        .collect::<Vec<(Item, i64)>>();
+    deltas.push((recipe.output.item.clone(), recipe.output.count as i64));
+
+    check_error_message(new_state, acting_agent_idx, None);
+    check_inventory_deltas(old_state, new_state, &deltas);
+}
+
+pub fn check_exit(old_state: &State, new_state: &State) {
+    let acting_agent_idx = old_state.agent_idx;
+
+    match old_state.agents[acting_agent_idx].open_menu {
+        Some(_) => {
+            assert_eq!(new_state.agents[acting_agent_idx].open_menu, None);
+            check_error_message(new_state, acting_agent_idx, None);
+        }
+        None => {
+            assert_eq!(new_state.agents[acting_agent_idx].open_menu, None);
+            check_error_message(new_state, acting_agent_idx, Some("nothing to exit"));
+        }
+    }
+
+    check_inventory_deltas(old_state, new_state, &[]);
+}
+
+/// While a menu is open the agent can only craft or exit.
+pub fn check_menu_locked(old_state: &State, new_state: &State) {
+    let acting_agent_idx = old_state.agent_idx;
+    assert_eq!(new_state.agents[acting_agent_idx].open_menu, old_state.agents[acting_agent_idx].open_menu);
+    check_error_message(new_state, acting_agent_idx, Some("you are at the ruined workbench: craft or exit"),);
+    check_inventory_deltas(old_state, new_state, &[]);
 }
 
 pub fn check_send_message(old_state: &State, new_state: &State, content: &str) {
@@ -164,9 +222,15 @@ pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
         return;
     };
 
+    let menu_open = old_state.agents[old_state.agent_idx].open_menu.is_some();
     match input.action {
+        Some(Action::MoveTo(_)) | Some(Action::Interact(_)) if menu_open => {
+            check_menu_locked(old_state, new_state);
+        }
         Some(Action::MoveTo(node_name)) => check_move_to(old_state, new_state, &node_name),
         Some(Action::Interact(poi_idx)) => check_interact(old_state, new_state, poi_idx),
+        Some(Action::Craft(recipe_idx)) => check_craft(old_state, new_state, recipe_idx),
+        Some(Action::Exit) => check_exit(old_state, new_state),
         None => {
             check_error_message(new_state, old_state.agent_idx, None);
             check_agents_idle(old_state, new_state, false);
@@ -185,20 +249,42 @@ pub fn check_flush_state(old_state: &State, new_state: &State, output: &str) {
     let agent = &old_state.agents[agent_idx];
     let node = &old_state.nodes[agent.node_idx];
 
-    let mut lines = vec![format!("Node: {} ({})", node.name, node.biome), "".to_string()];
+    let mut lines = vec![];
 
-    lines.push("Agents:".to_string());
-    for other_agent in &old_state.agents {
-        if other_agent.node_idx != agent.node_idx { continue; }
-        lines.push(other_agent.name.clone());
-    }
-    lines.push("".to_string());
+    match agent.open_menu {
+        // an open menu replaces the node view, but the agent still holds items and still hears the room
+        Some(Menu::Workbench) => {
+            lines.push("Workbench: craft or exit".to_string());
+            lines.push("".to_string());
 
-    lines.push("POIs:".to_string());
-    for (poi_idx, poi) in node.pois.iter().enumerate() {
-        lines.push(format!("[{}] {:?}", poi_idx, poi));
+            lines.push("Recipes:".to_string());
+            for (recipe_idx, recipe) in workbench_recipes().iter().enumerate() {
+                let ingredients = recipe.ingredients.iter()
+                    .map(|ingredient| format!("{} {:?}", ingredient.count, ingredient.item))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                lines.push(format!("[{}] {:?} <- {}", recipe_idx, recipe.output.item, ingredients));
+            }
+            lines.push("".to_string());
+        }
+        None => {
+            lines.push(format!("Node: {} ({})", node.name, node.biome));
+            lines.push("".to_string());
+
+            lines.push("Agents:".to_string());
+            for other_agent in &old_state.agents {
+                if other_agent.node_idx != agent.node_idx { continue; }
+                lines.push(other_agent.name.clone());
+            }
+            lines.push("".to_string());
+
+            lines.push("POIs:".to_string());
+            for (poi_idx, poi) in node.pois.iter().enumerate() {
+                lines.push(format!("[{}] {:?}", poi_idx, poi));
+            }
+            lines.push("".to_string());
+        }
     }
-    lines.push("".to_string());
 
     lines.push("Inventory:".to_string());
     for item_stack in &agent.inventory {

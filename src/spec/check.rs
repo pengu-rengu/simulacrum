@@ -1,5 +1,5 @@
 use crate::spec::spec::{check_next_state, check_flush_state};
-use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell, Item, ItemStack, PointOfInterest};
+use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell, Item, ItemStack, PointOfInterest, Menu};
 use crate::impl_::next_state::{flush_state, next_state};
 use std::{
     iter::zip,
@@ -24,6 +24,8 @@ fn mock_states() -> Vec<State> {
                 for agent_idx in 0..num_agents {
                     // 0: nothing, 1: enough to craft, 2: holds a pickaxe, 3: partial materials
                     for inventory_kind in 0..4 {
+                    // the acting agent is either in the node view or standing at the workbench menu
+                    for open_menu in [None, Some(Menu::Workbench)] {
                     for has_error in [false, true] {
                         let agents = (0..num_agents).map(|a| Agent {
                             name: format!("Agent{a}"),
@@ -65,6 +67,12 @@ fn mock_states() -> Vec<State> {
                                     ItemStack { item: Item::SmoothPebble, count: 9 },
                                 ],
                             },
+                            // only the acting agent opens a menu, and only where a workbench stands
+                            open_menu: if a == agent_idx && (a + shift) % num_nodes == 0 {
+                                open_menu.clone()
+                            } else {
+                                None
+                            },
                         }).collect();
                         base_states.push(State {
                             turn: num_agents + shift,
@@ -77,6 +85,7 @@ fn mock_states() -> Vec<State> {
                                 pois: if n == 0 { all_pois.to_vec() } else { vec![] },
                             }).collect(),
                         });
+                    }
                     }
                     }
                 }
@@ -117,6 +126,10 @@ fn mock_input_strs() -> Vec<String> {
         serde_json::json!({ "action": { "interact": "zero" } }).to_string(),
         serde_json::json!({ "action": { "move_to": "Node1" }, "send_message": "heading out" }).to_string(),
         serde_json::json!({ "action": { "interact": 0 }, "send_message": "grabbing a stick" }).to_string(),
+        serde_json::json!({ "action": { "craft": 0 } }).to_string(),
+        serde_json::json!({ "action": { "craft": 9 } }).to_string(),
+        serde_json::json!({ "action": "exit" }).to_string(),
+        serde_json::json!({ "action": { "craft": 0 }, "send_message": "making a pickaxe" }).to_string(),
     ];
     (0..mock_states().len())
         .map(|i| base_inputs[i % base_inputs.len()].clone())
@@ -134,8 +147,12 @@ fn assumptions(state: &State) {
         for message in &agent.node_messages_inbox {
             assert!(message.sender_agent_idx < state.agents.len());
         }
+        
+        // a menu is only open where the thing it belongs to stands
+        if agent.open_menu == Some(Menu::Workbench) {
+            assert!(state.nodes[agent.node_idx].pois.contains(&PointOfInterest::RuinedWorkbench));
+        }
 
-        // inventories are canonical: one stack per item kind, never empty
         let items = agent.inventory.iter().map(|item_stack| &item_stack.item).collect::<Vec<&Item>>();
         for item_stack in &agent.inventory {
             assert!(item_stack.count > 0);

@@ -7,7 +7,29 @@ pub struct Agent {
     pub node_messages_inbox: Vec<Message>,
     pub error_message: Option<String>,
     pub body_grid: BodyGrid,
-    pub inventory: Vec<ItemStack>
+    pub inventory: Vec<ItemStack>,
+    pub open_menu: Option<Menu>
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum Menu {
+    Workbench
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Recipe {
+    pub output: ItemStack,
+    pub ingredients: Vec<ItemStack>
+}
+
+pub fn workbench_recipes() -> Vec<Recipe> {
+    vec![Recipe {
+        output: ItemStack { item: Item::CrudePickaxe, count: 1 },
+        ingredients: vec![
+            ItemStack { item: Item::Stick, count: 10 },
+            ItemStack { item: Item::SmoothPebble, count: 10 },
+        ],
+    }]
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -72,7 +94,9 @@ pub struct State {
 #[serde(rename_all = "snake_case")]
 pub enum Action {
     MoveTo(String),
-    Interact(usize)
+    Interact(usize),
+    Craft(usize),
+    Exit
 }
 
 #[derive(Deserialize)]

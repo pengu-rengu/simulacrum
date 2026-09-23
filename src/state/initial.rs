@@ -21,6 +21,7 @@ impl State {
                     error_message: None,
                     body_grid: initial_body_grid(),
                     inventory: vec![],
+                    open_menu: None,
                 },
                 Agent {
                     name: "Agent2".to_string(),
@@ -28,7 +29,8 @@ impl State {
                     node_messages_inbox: vec![],
                     error_message: None,
                     body_grid: initial_body_grid(),
-                    inventory: vec![]
+                    inventory: vec![],
+                    open_menu: None
                 },
             ],
             nodes: vec![
