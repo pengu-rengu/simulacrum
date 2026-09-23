@@ -10,11 +10,13 @@ impl State {
                     name: "Agent1".to_string(),
                     node_idx: 0,
                     node_messages_inbox: vec![],
+                    error_message: None,
                 },
                 Agent {
                     name: "Agent2".to_string(),
                     node_idx: 0,
                     node_messages_inbox: vec![],
+                    error_message: None
                 },
             ],
             nodes: vec![Node {

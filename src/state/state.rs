@@ -4,7 +4,14 @@ use serde::{Serialize, Deserialize};
 pub struct Agent {
     pub name: String,
     pub node_idx: usize,
-    pub node_messages_inbox: Vec<String>
+    pub node_messages_inbox: Vec<Message>,
+    pub error_message: Option<String>
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct Message {
+    pub sender_agent_idx: usize,
+    pub content: String
 }
 
 #[derive(Serialize, Deserialize, Clone)]

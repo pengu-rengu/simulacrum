@@ -16,7 +16,7 @@ use spec::check::check;
 fn agent_file_path(agent_name: &str) -> PathBuf {
     let mut path = PathBuf::from("agents");
     path.push(agent_name);
-    path.set_extension("json");
+    path.set_extension("txt");
     path
 }
 
