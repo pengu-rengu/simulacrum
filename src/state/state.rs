@@ -6,7 +6,23 @@ pub struct Agent {
     pub node_idx: usize,
     pub node_messages_inbox: Vec<Message>,
     pub error_message: Option<String>,
-    pub body_grid: BodyGrid
+    pub body_grid: BodyGrid,
+    pub inventory: Vec<ItemStack>
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum Item {
+    Stick,
+    Resin,
+    SmoothPebble,
+    CopperOre,
+    CrudePickaxe
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct ItemStack {
+    pub item: Item,
+    pub count: usize
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -31,7 +47,17 @@ pub struct Message {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Node {
     pub name: String,
-    pub biome: String
+    pub biome: String,
+    pub pois: Vec<PointOfInterest>
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum PointOfInterest {
+    Thornbush,
+    AmberBole,
+    SmoothPebble,
+    CopperOreVein,
+    RuinedWorkbench
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -43,7 +69,14 @@ pub struct State {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Action {
+    MoveTo(String),
+    Interact(usize)
+}
+
+#[derive(Deserialize)]
 pub struct Input {
-    pub send_message: Option<String>,
-    pub move_to: Option<String>
+    pub action: Option<Action>,
+    pub send_message: Option<String>
 }

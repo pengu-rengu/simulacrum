@@ -1,4 +1,4 @@
-use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell};
+use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell, PointOfInterest};
 
 fn initial_body_grid() -> BodyGrid {
     BodyGrid {
@@ -20,19 +20,38 @@ impl State {
                     node_messages_inbox: vec![],
                     error_message: None,
                     body_grid: initial_body_grid(),
+                    inventory: vec![],
                 },
                 Agent {
                     name: "Agent2".to_string(),
                     node_idx: 0,
                     node_messages_inbox: vec![],
                     error_message: None,
-                    body_grid: initial_body_grid()
+                    body_grid: initial_body_grid(),
+                    inventory: vec![]
                 },
             ],
-            nodes: vec![Node {
-                name: "Node1".to_string(),
-                biome: "Amberwood thicket".to_string()
-            }],
+            nodes: vec![
+                Node {
+                    name: "Sapwell Hollow".to_string(),
+                    biome: "Amberwood thicket".to_string(),
+                    pois: vec![
+                        PointOfInterest::Thornbush,
+                        PointOfInterest::AmberBole,
+                        PointOfInterest::SmoothPebble,
+                        PointOfInterest::RuinedWorkbench,
+                    ],
+                },
+                Node {
+                    name: "Amberveins".to_string(),
+                    biome: "Amberwood thicket".to_string(),
+                    pois: vec![
+                        PointOfInterest::CopperOreVein,
+                        PointOfInterest::Thornbush,
+                        PointOfInterest::SmoothPebble,
+                    ],
+                },
+            ],
         }
     }
 }
