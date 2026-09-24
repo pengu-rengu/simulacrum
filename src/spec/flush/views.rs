@@ -1,5 +1,6 @@
 use crate::state::state::{State, Agent};
-use crate::spec::common::{item_label, poi_label, workbench_recipes};
+use crate::state::state::WORKBENCH_RECIPES;
+use crate::spec::common::{item_label, poi_label};
 
 /// Where the agent stands, who else is there, and what it can work on.
 pub fn node_lines(state: &State, agent: &Agent) -> Vec<String> {
@@ -27,7 +28,7 @@ pub fn workbench_lines() -> Vec<String> {
     let mut lines = vec!["Workbench: craft or exit".to_string(), "".to_string()];
 
     lines.push("Recipes:".to_string());
-    for (recipe_idx, recipe) in workbench_recipes().iter().enumerate() {
+    for (recipe_idx, recipe) in WORKBENCH_RECIPES.iter().enumerate() {
         let ingredients = recipe.ingredients.iter()
             .map(|ingredient| format!("{} {}", ingredient.count, item_label(&ingredient.item)))
             .collect::<Vec<String>>()

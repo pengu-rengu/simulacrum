@@ -1,7 +1,7 @@
-use crate::state::state::{State, PointOfInterest, Menu};
+use crate::state::state::{State, PoiKind, Menu, WORKBENCH_RECIPES};
 use crate::spec::common::{
     check_agent_unchanged, check_error_message, check_inventory, inventory_with,
-    item_count, item_label, workbench_recipes,
+    item_count, item_label,
 };
 
 /// Inspecting is how a menu is opened; only the workbench has one.
@@ -12,11 +12,11 @@ pub fn check_inspect(old_state: &State, new_state: &State, poi_idx: usize) {
 
     let expected_error = match poi {
         None => Some(format!("no poi at index {poi_idx}")),
-        Some(PointOfInterest::RuinedWorkbench) => None,
+        Some(poi) if poi.kind == PoiKind::RuinedWorkbench => None,
         Some(_) => Some("nothing to inspect here".to_string()),
     };
     let expected_open_menu = match poi {
-        Some(PointOfInterest::RuinedWorkbench) => Some(Menu::Workbench),
+        Some(poi) if poi.kind == PoiKind::RuinedWorkbench => Some(Menu::Workbench),
         _ => acting_agent.open_menu.clone(),
     };
 
@@ -38,8 +38,7 @@ pub fn check_craft(old_state: &State, new_state: &State, recipe_idx: usize) {
         return;
     }
 
-    let recipes = workbench_recipes();
-    let Some(recipe) = recipes.get(recipe_idx) else {
+    let Some(recipe) = WORKBENCH_RECIPES.get(recipe_idx) else {
         check_error_message(new_state, acting_agent_idx, Some(&format!("no recipe at index {recipe_idx}")));
         check_agent_unchanged(old_state, new_state);
         return;
@@ -58,7 +57,7 @@ pub fn check_craft(old_state: &State, new_state: &State, recipe_idx: usize) {
     }
 
     let mut expected_inventory = acting_agent.inventory.clone();
-    for ingredient in &recipe.ingredients {
+    for ingredient in recipe.ingredients {
         let item_stack_idx = expected_inventory.iter()
             .position(|item_stack| item_stack.item == ingredient.item)
             .unwrap();

@@ -1,5 +1,5 @@
 use crate::spec::spec::{check_next_state, check_flush_state};
-use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell, Item, ItemStack, PointOfInterest, Menu};
+use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell, Item, ItemStack, PointOfInterest, PoiKind, Deposit, Menu, POI_YIELDS};
 use crate::impl_::next_state::{flush_state, next_state};
 use std::{
     iter::zip,
@@ -82,11 +82,23 @@ fn mock_states() -> Vec<State> {
                                 biome: "Amberwood thicket".to_string(),
                                 pois: if n == 0 {
                                     vec![
-                                        PointOfInterest::Thornbush { exposure, stability, reserves: 20 },
-                                        PointOfInterest::AmberBole { exposure, stability, reserves: 12 },
-                                        PointOfInterest::SmoothPebble { exposure, stability, reserves: 30 },
-                                        PointOfInterest::CopperOreVein { exposure, stability, reserves: 8 },
-                                        PointOfInterest::RuinedWorkbench,
+                                        PointOfInterest {
+                                            kind: PoiKind::Thornbush,
+                                            deposit: Some(Deposit { exposure, stability, reserves: 20 }),
+                                        },
+                                        PointOfInterest {
+                                            kind: PoiKind::AmberBole,
+                                            deposit: Some(Deposit { exposure, stability, reserves: 12 }),
+                                        },
+                                        PointOfInterest {
+                                            kind: PoiKind::SmoothPebble,
+                                            deposit: Some(Deposit { exposure, stability, reserves: 30 }),
+                                        },
+                                        PointOfInterest {
+                                            kind: PoiKind::CopperOreVein,
+                                            deposit: Some(Deposit { exposure, stability, reserves: 8 }),
+                                        },
+                                        PointOfInterest { kind: PoiKind::RuinedWorkbench, deposit: None },
                                     ]
                                 } else {
                                     vec![]
@@ -177,7 +189,8 @@ fn assumptions(state: &State) {
         
         // a menu is only open where the thing it belongs to stands
         if agent.open_menu == Some(Menu::Workbench) {
-            assert!(state.nodes[agent.node_idx].pois.contains(&PointOfInterest::RuinedWorkbench));
+            assert!(state.nodes[agent.node_idx].pois.iter()
+                .any(|poi| poi.kind == PoiKind::RuinedWorkbench));
         }
 
         for item_stack in &agent.inventory {
@@ -191,6 +204,13 @@ fn assumptions(state: &State) {
         for item_stack in &agent.inventory {
             assert!(item_stack.count > 0);
             assert_eq!(items.iter().filter(|item| ***item == item_stack.item).count(), 1);
+        }
+    }
+
+    for node in &state.nodes {
+        for poi in &node.pois {
+            let harvestable = POI_YIELDS.iter().any(|(kind, _, _)| *kind == poi.kind);
+            assert_eq!(harvestable, poi.deposit.is_some());
         }
     }
 

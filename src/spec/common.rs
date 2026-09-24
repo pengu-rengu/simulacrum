@@ -1,15 +1,5 @@
-use crate::state::state::{State, Item, ItemStack, Recipe, PointOfInterest};
+use crate::state::state::{State, Item, ItemStack, PointOfInterest, POI_YIELDS};
 use std::iter::zip;
-
-pub fn workbench_recipes() -> Vec<Recipe> {
-    vec![Recipe {
-        output: ItemStack { item: Item::CrudePickaxe { durability: 20 }, count: 1 },
-        ingredients: vec![
-            ItemStack { item: Item::Stick, count: 10 },
-            ItemStack { item: Item::SmoothPebble, count: 10 },
-        ],
-    }]
-}
 
 pub fn item_label(item: &Item) -> String {
     match item {
@@ -19,39 +9,20 @@ pub fn item_label(item: &Item) -> String {
 }
 
 pub fn poi_label(poi: &PointOfInterest) -> String {
-    let name = match poi {
-        PointOfInterest::Thornbush { .. } => "Thornbush",
-        PointOfInterest::AmberBole { .. } => "AmberBole",
-        PointOfInterest::SmoothPebble { .. } => "SmoothPebble",
-        PointOfInterest::CopperOreVein { .. } => "CopperOreVein",
-        PointOfInterest::RuinedWorkbench => return "RuinedWorkbench".to_string(),
-    };
-    let (exposure, stability, reserves) = poi_deposit(poi).unwrap();
-    format!("{name} (exposure {exposure}, stability {stability}, reserves {reserves})")
-}
-
-/// The constants a deposit is worked against, or None for something that cannot be harvested.
-pub fn poi_deposit(poi: &PointOfInterest) -> Option<(usize, usize, usize)> {
-    match poi {
-        PointOfInterest::Thornbush { exposure, stability, reserves }
-        | PointOfInterest::AmberBole { exposure, stability, reserves }
-        | PointOfInterest::SmoothPebble { exposure, stability, reserves }
-        | PointOfInterest::CopperOreVein { exposure, stability, reserves } => {
-            Some((*exposure, *stability, *reserves))
-        }
-        PointOfInterest::RuinedWorkbench => None,
+    match &poi.deposit {
+        None => format!("{:?}", poi.kind),
+        Some(deposit) => format!(
+            "{:?} (exposure {}, stability {}, reserves {})",
+            poi.kind, deposit.exposure, deposit.stability, deposit.reserves
+        ),
     }
 }
 
 /// What one swing yields, and whether a crude pickaxe is required for it.
 pub fn poi_yield(poi: &PointOfInterest) -> Option<(Item, bool)> {
-    match poi {
-        PointOfInterest::Thornbush { .. } => Some((Item::Stick, false)),
-        PointOfInterest::AmberBole { .. } => Some((Item::Resin, false)),
-        PointOfInterest::SmoothPebble { .. } => Some((Item::SmoothPebble, false)),
-        PointOfInterest::CopperOreVein { .. } => Some((Item::CopperOre, true)),
-        PointOfInterest::RuinedWorkbench => None,
-    }
+    POI_YIELDS.iter()
+        .find(|(kind, _, _)| *kind == poi.kind)
+        .map(|(_, item, needs_pickaxe)| (item.clone(), *needs_pickaxe))
 }
 
 pub fn item_count(agent_inventory: &Vec<ItemStack>, item: &Item) -> usize {

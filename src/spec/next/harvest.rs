@@ -1,7 +1,7 @@
 use crate::state::state::{State, Item, ItemStack};
 use crate::spec::common::{
     check_agent_unchanged, check_error_message, check_inventory, inventory_with,
-    item_label, poi_deposit, poi_yield,
+    item_label, poi_yield,
 };
 
 pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_idx: Option<usize>, uses: usize) {
@@ -18,8 +18,7 @@ pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_
         return;
     };
 
-    let (Some((exposure, stability, _)), Some((harvested_item, needs_pickaxe))) =
-        (poi_deposit(poi), poi_yield(poi)) else {
+    let (Some(deposit), Some((harvested_item, needs_pickaxe))) = (&poi.deposit, poi_yield(poi)) else {
         check_error_message(new_state, acting_agent_idx, Some("nothing to harvest here"));
         check_agent_unchanged(old_state, new_state);
         return;
@@ -94,17 +93,17 @@ pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_
         }
     }
 
-    if uses > stability {
+    if uses > deposit.stability {
         check_error_message(
             new_state,
             acting_agent_idx,
-            Some(&format!("too many swings: this takes at most {stability}")),
+            Some(&format!("too many swings: this takes at most {}", deposit.stability)),
         );
         check_inventory(old_state, new_state, &expected_inventory);
         return;
     }
 
-    let harvested_count = uses.min(exposure);
+    let harvested_count = uses.min(deposit.exposure);
     let expected_inventory = inventory_with(&expected_inventory, &harvested_item, harvested_count);
     check_error_message(new_state, acting_agent_idx, None);
     check_inventory(old_state, new_state, &expected_inventory);

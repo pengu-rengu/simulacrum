@@ -19,8 +19,16 @@ pub enum Menu {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Recipe {
     pub output: ItemStack,
-    pub ingredients: Vec<ItemStack>
+    pub ingredients: &'static [ItemStack]
 }
+
+pub const WORKBENCH_RECIPES: &[Recipe] = &[Recipe {
+    output: ItemStack { item: Item::CrudePickaxe { durability: 20 }, count: 1 },
+    ingredients: &[
+        ItemStack { item: Item::Stick, count: 10 },
+        ItemStack { item: Item::SmoothPebble, count: 10 },
+    ],
+}];
 
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -69,13 +77,34 @@ pub struct Node {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum PointOfInterest {
-    Thornbush { exposure: usize, stability: usize, reserves: usize },
-    AmberBole { exposure: usize, stability: usize, reserves: usize },
-    SmoothPebble { exposure: usize, stability: usize, reserves: usize },
-    CopperOreVein { exposure: usize, stability: usize, reserves: usize },
+pub enum PoiKind {
+    Thornbush,
+    AmberBole,
+    SmoothPebble,
+    CopperOreVein,
     RuinedWorkbench
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct Deposit {
+    pub exposure: usize,
+    pub stability: usize,
+    pub reserves: usize
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct PointOfInterest {
+    pub kind: PoiKind,
+    pub deposit: Option<Deposit>
+}
+
+/// What one swing yields, and whether it needs a pickaxe. A kind absent here cannot be harvested.
+pub const POI_YIELDS: &[(PoiKind, Item, bool)] = &[
+    (PoiKind::Thornbush, Item::Stick, false),
+    (PoiKind::AmberBole, Item::Resin, false),
+    (PoiKind::SmoothPebble, Item::SmoothPebble, false),
+    (PoiKind::CopperOreVein, Item::CopperOre, true),
+];
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct State {
