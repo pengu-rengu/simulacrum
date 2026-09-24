@@ -10,13 +10,8 @@ fn mock_states() -> Vec<State> {
     let contents = ["hi", "", "line1\nline2", "with \"quotes\""];
     let mut base_states = vec![State::new()];
 
-    let all_pois = [
-        PointOfInterest::Thornbush,
-        PointOfInterest::AmberBole,
-        PointOfInterest::SmoothPebble,
-        PointOfInterest::CopperOreVein,
-        PointOfInterest::RuinedWorkbench,
-    ];
+    // (exposure, stability): nothing exposed, one swing only, and a healthy deposit
+    let deposit_kinds = [(0, 3), (2, 1), (2, 4)];
 
     for num_agents in 1..=3 {
         for num_nodes in 1..=2 {
@@ -25,6 +20,7 @@ fn mock_states() -> Vec<State> {
                     // 0: nothing, 1: enough to craft, 2: holds a pickaxe, 3: partial materials
                     for inventory_kind in 0..4 {
                     // the acting agent is either in the node view or standing at the workbench menu
+                    for (exposure, stability) in deposit_kinds {
                     for open_menu in [None, Some(Menu::Workbench)] {
                     for has_error in [false, true] {
                         let agents = (0..num_agents).map(|a| Agent {
@@ -58,9 +54,11 @@ fn mock_states() -> Vec<State> {
                                     ItemStack { item: Item::Stick, count: 10 + a },
                                     ItemStack { item: Item::SmoothPebble, count: 10 },
                                 ],
+                                // two pickaxes: picking the right tool_idx is the point of indexing
                                 2 => vec![
-                                    ItemStack { item: Item::CrudePickaxe, count: 1 },
+                                    ItemStack { item: Item::CrudePickaxe { durability: 1 }, count: 1 },
                                     ItemStack { item: Item::Resin, count: 3 },
+                                    ItemStack { item: Item::CrudePickaxe { durability: 20 }, count: 1 },
                                 ],
                                 _ => vec![
                                     ItemStack { item: Item::Stick, count: 10 },
@@ -82,9 +80,20 @@ fn mock_states() -> Vec<State> {
                             nodes: (0..num_nodes).map(|n| Node {
                                 name: format!("Node{n}"),
                                 biome: "Amberwood thicket".to_string(),
-                                pois: if n == 0 { all_pois.to_vec() } else { vec![] },
+                                pois: if n == 0 {
+                                    vec![
+                                        PointOfInterest::Thornbush { exposure, stability, reserves: 20 },
+                                        PointOfInterest::AmberBole { exposure, stability, reserves: 12 },
+                                        PointOfInterest::SmoothPebble { exposure, stability, reserves: 30 },
+                                        PointOfInterest::CopperOreVein { exposure, stability, reserves: 8 },
+                                        PointOfInterest::RuinedWorkbench,
+                                    ]
+                                } else {
+                                    vec![]
+                                },
                             }).collect(),
                         });
+                    }
                     }
                     }
                     }
@@ -93,10 +102,10 @@ fn mock_states() -> Vec<State> {
         }
     }
 
-    // check() zips states with inputs, so repeat each state 32 times;
-    // mock_input_strs() cycles its (<= 32) inputs, pairing every state with every input
+    // check() zips states with inputs, so repeat each state 48 times;
+    // mock_input_strs() cycles its (<= 48) inputs, pairing every state with every input
     base_states.into_iter()
-        .flat_map(|state| std::iter::repeat_n(state, 32))
+        .flat_map(|state| std::iter::repeat_n(state, 48))
         .collect()
 }
 
@@ -116,16 +125,34 @@ fn mock_input_strs() -> Vec<String> {
         serde_json::json!({ "action": { "move_to": "Node1" } }).to_string(),
         serde_json::json!({ "action": { "move_to": "Nowhere" } }).to_string(),
         serde_json::json!({ "action": { "move_to": "" } }).to_string(),
-        serde_json::json!({ "action": { "interact": 0 } }).to_string(),
-        serde_json::json!({ "action": { "interact": 1 } }).to_string(),
-        serde_json::json!({ "action": { "interact": 2 } }).to_string(),
-        serde_json::json!({ "action": { "interact": 3 } }).to_string(),
-        serde_json::json!({ "action": { "interact": 4 } }).to_string(),
-        serde_json::json!({ "action": { "interact": 99 } }).to_string(),
+        // bare-handed harvests
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 0, "uses": 1 } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 1, "uses": 2 } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 2, "uses": 4 } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 0, "uses": 0 } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 0, "uses": 99 } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "uses": 1 } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 4, "uses": 1 } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 99, "uses": 1 } } }).to_string(),
+        // with a tool: index 0 is the worn pickaxe, 2 the fresh one, 1 is not a tool at all
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idx": 0, "uses": 1 } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idx": 0, "uses": 2 } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idx": 2, "uses": 2 } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idx": 2, "uses": 99 } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 1, "tool_idx": 2, "uses": 1 } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idx": 1, "uses": 1 } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idx": 99, "uses": 1 } } }).to_string(),
+        // inspect
+        serde_json::json!({ "action": { "inspect": { "poi_idx": 4 } } }).to_string(),
+        serde_json::json!({ "action": { "inspect": { "poi_idx": 0 } } }).to_string(),
+        serde_json::json!({ "action": { "inspect": { "poi_idx": 99 } } }).to_string(),
+        // malformed actions
         serde_json::json!({ "action": { "fly": 1 } }).to_string(),
-        serde_json::json!({ "action": { "interact": "zero" } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 0 } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": "zero", "uses": 1 } } }).to_string(),
+        // action plus message
         serde_json::json!({ "action": { "move_to": "Node1" }, "send_message": "heading out" }).to_string(),
-        serde_json::json!({ "action": { "interact": 0 }, "send_message": "grabbing a stick" }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 0, "uses": 1 } }, "send_message": "grabbing a stick" }).to_string(),
         serde_json::json!({ "action": { "craft": 0 } }).to_string(),
         serde_json::json!({ "action": { "craft": 9 } }).to_string(),
         serde_json::json!({ "action": "exit" }).to_string(),
@@ -151,6 +178,13 @@ fn assumptions(state: &State) {
         // a menu is only open where the thing it belongs to stands
         if agent.open_menu == Some(Menu::Workbench) {
             assert!(state.nodes[agent.node_idx].pois.contains(&PointOfInterest::RuinedWorkbench));
+        }
+
+        for item_stack in &agent.inventory {
+            if let Item::CrudePickaxe { durability } = item_stack.item {
+                assert!(durability > 0);
+                assert!(item_stack.count > 0);
+            }
         }
 
         let items = agent.inventory.iter().map(|item_stack| &item_stack.item).collect::<Vec<&Item>>();

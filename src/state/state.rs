@@ -22,15 +22,6 @@ pub struct Recipe {
     pub ingredients: Vec<ItemStack>
 }
 
-pub fn workbench_recipes() -> Vec<Recipe> {
-    vec![Recipe {
-        output: ItemStack { item: Item::CrudePickaxe, count: 1 },
-        ingredients: vec![
-            ItemStack { item: Item::Stick, count: 10 },
-            ItemStack { item: Item::SmoothPebble, count: 10 },
-        ],
-    }]
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum Item {
@@ -38,8 +29,12 @@ pub enum Item {
     Resin,
     SmoothPebble,
     CopperOre,
-    CrudePickaxe
+    CrudePickaxe { durability: usize }
 }
+
+
+
+
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ItemStack {
@@ -75,10 +70,10 @@ pub struct Node {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum PointOfInterest {
-    Thornbush,
-    AmberBole,
-    SmoothPebble,
-    CopperOreVein,
+    Thornbush { exposure: usize, stability: usize, reserves: usize },
+    AmberBole { exposure: usize, stability: usize, reserves: usize },
+    SmoothPebble { exposure: usize, stability: usize, reserves: usize },
+    CopperOreVein { exposure: usize, stability: usize, reserves: usize },
     RuinedWorkbench
 }
 
@@ -94,7 +89,8 @@ pub struct State {
 #[serde(rename_all = "snake_case")]
 pub enum Action {
     MoveTo(String),
-    Interact(usize),
+    Harvest { poi_idx: usize, tool_idx: Option<usize>, uses: usize },
+    Inspect { poi_idx: usize },
     Craft(usize),
     Exit
 }
