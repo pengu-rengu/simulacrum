@@ -1,4 +1,4 @@
-use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell, PointOfInterest, PoiKind, Deposit};
+use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell, PointOfInterest, Deposit};
 
 fn initial_body_grid() -> BodyGrid {
     BodyGrid {
@@ -38,37 +38,19 @@ impl State {
                     name: "Sapwell Hollow".to_string(),
                     biome: "Amberwood thicket".to_string(),
                     pois: vec![
-                        PointOfInterest {
-                            kind: PoiKind::Thornbush,
-                            deposit: Some(Deposit { exposure: 3, stability: 4, reserves: 20 }),
-                        },
-                        PointOfInterest {
-                            kind: PoiKind::AmberBole,
-                            deposit: Some(Deposit { exposure: 2, stability: 3, reserves: 12 }),
-                        },
-                        PointOfInterest {
-                            kind: PoiKind::SmoothPebble,
-                            deposit: Some(Deposit { exposure: 4, stability: 6, reserves: 30 }),
-                        },
-                        PointOfInterest { kind: PoiKind::RuinedWorkbench, deposit: None },
+                        PointOfInterest::Thornbush { deposit: Deposit { exposure: 3, stability: 4, reserves: 20 } },
+                        PointOfInterest::AmberBole { deposit: Deposit { exposure: 2, stability: 3, reserves: 12 } },
+                        PointOfInterest::SmoothPebble { deposit: Deposit { exposure: 4, stability: 6, reserves: 30 } },
+                        PointOfInterest::RuinedWorkbench,
                     ],
                 },
                 Node {
                     name: "Amberveins".to_string(),
                     biome: "Amberwood thicket".to_string(),
                     pois: vec![
-                        PointOfInterest {
-                            kind: PoiKind::CopperOreVein,
-                            deposit: Some(Deposit { exposure: 2, stability: 5, reserves: 8 }),
-                        },
-                        PointOfInterest {
-                            kind: PoiKind::Thornbush,
-                            deposit: Some(Deposit { exposure: 1, stability: 2, reserves: 6 }),
-                        },
-                        PointOfInterest {
-                            kind: PoiKind::SmoothPebble,
-                            deposit: Some(Deposit { exposure: 4, stability: 6, reserves: 30 }),
-                        },
+                        PointOfInterest::CopperOreVein { deposit: Deposit { exposure: 2, stability: 5, reserves: 8 } },
+                        PointOfInterest::Thornbush { deposit: Deposit { exposure: 1, stability: 2, reserves: 6 } },
+                        PointOfInterest::SmoothPebble { deposit: Deposit { exposure: 4, stability: 6, reserves: 30 } },
                     ],
                 },
             ],

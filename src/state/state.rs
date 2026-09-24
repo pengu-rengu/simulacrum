@@ -40,10 +40,6 @@ pub enum Item {
     CrudePickaxe { durability: usize }
 }
 
-
-
-
-
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ItemStack {
     pub item: Item,
@@ -77,11 +73,11 @@ pub struct Node {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum PoiKind {
-    Thornbush,
-    AmberBole,
-    SmoothPebble,
-    CopperOreVein,
+pub enum PointOfInterest {
+    Thornbush { deposit: Deposit},
+    AmberBole { deposit: Deposit},
+    SmoothPebble { deposit: Deposit},
+    CopperOreVein { deposit: Deposit},
     RuinedWorkbench
 }
 
@@ -92,18 +88,12 @@ pub struct Deposit {
     pub reserves: usize
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct PointOfInterest {
-    pub kind: PoiKind,
-    pub deposit: Option<Deposit>
-}
-
-/// What one swing yields, and whether it needs a pickaxe. A kind absent here cannot be harvested.
-pub const POI_YIELDS: &[(PoiKind, Item, bool)] = &[
-    (PoiKind::Thornbush, Item::Stick, false),
-    (PoiKind::AmberBole, Item::Resin, false),
-    (PoiKind::SmoothPebble, Item::SmoothPebble, false),
-    (PoiKind::CopperOreVein, Item::CopperOre, true),
+/// What one swing yields, and whether it needs a pickaxe. A poi absent here cannot be harvested.
+pub const POI_YIELDS: &[(&str, Item, bool)] = &[
+    ("Thornbush", Item::Stick, false),
+    ("AmberBole", Item::Resin, false),
+    ("SmoothPebble", Item::SmoothPebble, false),
+    ("CopperOreVein", Item::CopperOre, true),
 ];
 
 #[derive(Serialize, Deserialize, Clone)]

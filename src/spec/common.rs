@@ -1,4 +1,4 @@
-use crate::state::state::{State, Item, ItemStack, PointOfInterest, POI_YIELDS};
+use crate::state::state::{State, Item, ItemStack, PointOfInterest, Deposit, POI_YIELDS};
 use std::iter::zip;
 
 pub fn item_label(item: &Item) -> String {
@@ -8,12 +8,32 @@ pub fn item_label(item: &Item) -> String {
     }
 }
 
+pub fn poi_name(poi: &PointOfInterest) -> &'static str {
+    match poi {
+        PointOfInterest::Thornbush { .. } => "Thornbush",
+        PointOfInterest::AmberBole { .. } => "AmberBole",
+        PointOfInterest::SmoothPebble { .. } => "SmoothPebble",
+        PointOfInterest::CopperOreVein { .. } => "CopperOreVein",
+        PointOfInterest::RuinedWorkbench => "RuinedWorkbench",
+    }
+}
+
+pub fn poi_deposit(poi: &PointOfInterest) -> Option<&Deposit> {
+    match poi {
+        PointOfInterest::Thornbush { deposit }
+        | PointOfInterest::AmberBole { deposit }
+        | PointOfInterest::SmoothPebble { deposit }
+        | PointOfInterest::CopperOreVein { deposit } => Some(deposit),
+        PointOfInterest::RuinedWorkbench => None,
+    }
+}
+
 pub fn poi_label(poi: &PointOfInterest) -> String {
-    match &poi.deposit {
-        None => format!("{:?}", poi.kind),
+    match poi_deposit(poi) {
+        None => poi_name(poi).to_string(),
         Some(deposit) => format!(
-            "{:?} (exposure {}, stability {}, reserves {})",
-            poi.kind, deposit.exposure, deposit.stability, deposit.reserves
+            "{} (exposure {}, stability {}, reserves {})",
+            poi_name(poi), deposit.exposure, deposit.stability, deposit.reserves
         ),
     }
 }
@@ -21,7 +41,7 @@ pub fn poi_label(poi: &PointOfInterest) -> String {
 /// What one swing yields, and whether a crude pickaxe is required for it.
 pub fn poi_yield(poi: &PointOfInterest) -> Option<(Item, bool)> {
     POI_YIELDS.iter()
-        .find(|(kind, _, _)| *kind == poi.kind)
+        .find(|(name, _, _)| *name == poi_name(poi))
         .map(|(_, item, needs_pickaxe)| (item.clone(), *needs_pickaxe))
 }
 

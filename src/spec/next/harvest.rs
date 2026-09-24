@@ -1,7 +1,7 @@
 use crate::state::state::{State, Item, ItemStack};
 use crate::spec::common::{
     check_agent_unchanged, check_error_message, check_inventory, inventory_with,
-    item_label, poi_yield,
+    item_label, poi_deposit, poi_yield,
 };
 
 pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_idx: Option<usize>, uses: usize) {
@@ -18,7 +18,7 @@ pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_
         return;
     };
 
-    let (Some(deposit), Some((harvested_item, needs_pickaxe))) = (&poi.deposit, poi_yield(poi)) else {
+    let (Some(deposit), Some((harvested_item, needs_pickaxe))) = (poi_deposit(poi), poi_yield(poi)) else {
         check_error_message(new_state, acting_agent_idx, Some("nothing to harvest here"));
         check_agent_unchanged(old_state, new_state);
         return;
@@ -34,11 +34,7 @@ pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_
         None => None,
         Some(tool_idx) => {
             let Some(item_stack) = acting_agent.inventory.get(tool_idx) else {
-                check_error_message(
-                    new_state,
-                    acting_agent_idx,
-                    Some(&format!("no item at inventory index {tool_idx}")),
-                );
+                check_error_message(new_state, acting_agent_idx, Some(&format!("no item at inventory index {tool_idx}")));
                 check_agent_unchanged(old_state, new_state);
                 return;
             };

@@ -31,9 +31,7 @@ pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
             check_menu_locked(old_state, new_state);
         }
         Some(Action::MoveTo(node_name)) => check_move_to(old_state, new_state, &node_name),
-        Some(Action::Harvest { poi_idx, tool_idx, uses }) => {
-            check_harvest(old_state, new_state, poi_idx, tool_idx, uses)
-        }
+        Some(Action::Harvest { poi_idx, tool_idx, uses }) => check_harvest(old_state, new_state, poi_idx, tool_idx, uses),
         Some(Action::Inspect { poi_idx }) => check_inspect(old_state, new_state, poi_idx),
         Some(Action::Craft(recipe_idx)) => check_craft(old_state, new_state, recipe_idx),
         Some(Action::Exit) => check_exit(old_state, new_state),

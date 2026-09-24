@@ -1,4 +1,4 @@
-use crate::state::state::{State, Input, Action, Message, Item, ItemStack, PoiKind, Menu, POI_YIELDS, WORKBENCH_RECIPES};
+use crate::state::state::{State, Input, Action, Message, Item, ItemStack, PointOfInterest, Menu, POI_YIELDS, WORKBENCH_RECIPES};
 use serde_json::from_str;
 
 pub fn flush_state(state: &State) -> (State, String) {
@@ -44,11 +44,18 @@ pub fn flush_state(state: &State) -> (State, String) {
 
             lines.push("POIs:".to_string());
             for (poi_idx, poi) in node.pois.iter().enumerate() {
-                let label = match &poi.deposit {
-                    None => format!("{:?}", poi.kind),
+                let (name, deposit) = match poi {
+                    PointOfInterest::Thornbush { deposit } => ("Thornbush", Some(deposit)),
+                    PointOfInterest::AmberBole { deposit } => ("AmberBole", Some(deposit)),
+                    PointOfInterest::SmoothPebble { deposit } => ("SmoothPebble", Some(deposit)),
+                    PointOfInterest::CopperOreVein { deposit } => ("CopperOreVein", Some(deposit)),
+                    PointOfInterest::RuinedWorkbench => ("RuinedWorkbench", None),
+                };
+                let label = match deposit {
+                    None => name.to_string(),
                     Some(deposit) => format!(
-                        "{:?} (exposure {}, stability {}, reserves {})",
-                        poi.kind, deposit.exposure, deposit.stability, deposit.reserves
+                        "{} (exposure {}, stability {}, reserves {})",
+                        name, deposit.exposure, deposit.stability, deposit.reserves
                     ),
                 };
                 lines.push(format!("[{}] {}", poi_idx, label));
@@ -118,12 +125,20 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                         let Some(poi) = state.nodes[curr_node_idx].pois.get(poi_idx) else {
                             break 'harvest Some(format!("no poi at index {poi_idx}"));
                         };
+                        let (name, deposit) = match poi {
+                            PointOfInterest::Thornbush { deposit } => ("Thornbush", deposit),
+                            PointOfInterest::AmberBole { deposit } => ("AmberBole", deposit),
+                            PointOfInterest::SmoothPebble { deposit } => ("SmoothPebble", deposit),
+                            PointOfInterest::CopperOreVein { deposit } => ("CopperOreVein", deposit),
+                            PointOfInterest::RuinedWorkbench => {
+                                break 'harvest Some("nothing to harvest here".to_string());
+                            }
+                        };
                         let Some((_, harvested_item, needs_pickaxe)) =
-                            POI_YIELDS.iter().find(|(kind, _, _)| *kind == poi.kind)
+                            POI_YIELDS.iter().find(|(yield_name, _, _)| *yield_name == name)
                         else {
                             break 'harvest Some("nothing to harvest here".to_string());
                         };
-                        let deposit = poi.deposit.as_ref().unwrap();
                         if uses == 0 {
                             break 'harvest Some("uses must be at least 1".to_string());
                         }
@@ -202,7 +217,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                             new_state.agents[curr_agent_idx].error_message =
                                 Some(format!("no poi at index {poi_idx}"));
                         }
-                        Some(poi) if poi.kind == PoiKind::RuinedWorkbench => {
+                        Some(PointOfInterest::RuinedWorkbench) => {
                             new_state.agents[curr_agent_idx].open_menu = Some(Menu::Workbench);
                         }
                         Some(_) => {

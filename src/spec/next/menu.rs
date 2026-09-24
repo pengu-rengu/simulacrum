@@ -1,4 +1,4 @@
-use crate::state::state::{State, PoiKind, Menu, WORKBENCH_RECIPES};
+use crate::state::state::{State, PointOfInterest, Menu, WORKBENCH_RECIPES};
 use crate::spec::common::{
     check_agent_unchanged, check_error_message, check_inventory, inventory_with,
     item_count, item_label,
@@ -12,11 +12,11 @@ pub fn check_inspect(old_state: &State, new_state: &State, poi_idx: usize) {
 
     let expected_error = match poi {
         None => Some(format!("no poi at index {poi_idx}")),
-        Some(poi) if poi.kind == PoiKind::RuinedWorkbench => None,
+        Some(poi) if matches!(poi, PointOfInterest::RuinedWorkbench) => None,
         Some(_) => Some("nothing to inspect here".to_string()),
     };
     let expected_open_menu = match poi {
-        Some(poi) if poi.kind == PoiKind::RuinedWorkbench => Some(Menu::Workbench),
+        Some(poi) if matches!(poi, PointOfInterest::RuinedWorkbench) => Some(Menu::Workbench),
         _ => acting_agent.open_menu.clone(),
     };
 
