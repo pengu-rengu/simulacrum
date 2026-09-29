@@ -1,4 +1,4 @@
-use crate::state::state::{State, Item, ItemStack, PointOfInterest, Deposit, POI_YIELDS};
+use crate::state::state::{State, Item, ItemStack, PointOfInterest};
 use std::iter::zip;
 
 pub fn item_label(item: &Item) -> String {
@@ -6,43 +6,6 @@ pub fn item_label(item: &Item) -> String {
         Item::CrudePickaxe { durability } => format!("CrudePickaxe (durability {durability})"),
         _ => format!("{:?}", item),
     }
-}
-
-pub fn poi_name(poi: &PointOfInterest) -> &'static str {
-    match poi {
-        PointOfInterest::Thornbush { .. } => "Thornbush",
-        PointOfInterest::AmberBole { .. } => "AmberBole",
-        PointOfInterest::SmoothPebble { .. } => "SmoothPebble",
-        PointOfInterest::CopperOreVein { .. } => "CopperOreVein",
-        PointOfInterest::RuinedWorkbench => "RuinedWorkbench",
-    }
-}
-
-pub fn poi_deposit(poi: &PointOfInterest) -> Option<&Deposit> {
-    match poi {
-        PointOfInterest::Thornbush { deposit }
-        | PointOfInterest::AmberBole { deposit }
-        | PointOfInterest::SmoothPebble { deposit }
-        | PointOfInterest::CopperOreVein { deposit } => Some(deposit),
-        PointOfInterest::RuinedWorkbench => None,
-    }
-}
-
-pub fn poi_label(poi: &PointOfInterest) -> String {
-    match poi_deposit(poi) {
-        None => poi_name(poi).to_string(),
-        Some(deposit) => format!(
-            "{} (exposure {}, stability {}, reserves {})",
-            poi_name(poi), deposit.exposure, deposit.stability, deposit.reserves
-        ),
-    }
-}
-
-/// What one swing yields, and whether a crude pickaxe is required for it.
-pub fn poi_yield(poi: &PointOfInterest) -> Option<(Item, bool)> {
-    POI_YIELDS.iter()
-        .find(|(name, _, _)| *name == poi_name(poi))
-        .map(|(_, item, needs_pickaxe)| (item.clone(), *needs_pickaxe))
 }
 
 pub fn item_count(agent_inventory: &Vec<ItemStack>, item: &Item) -> usize {
@@ -59,12 +22,31 @@ pub fn inventory_with(inventory: &Vec<ItemStack>, item: &Item, count: usize) -> 
 
     match item {
         Item::CrudePickaxe { .. } => new_inventory.push(ItemStack { item: item.clone(), count }),
-        _ => match new_inventory.iter_mut().find(|item_stack| item_stack.item == *item) {
-            Some(item_stack) => item_stack.count += count,
-            None => new_inventory.push(ItemStack { item: item.clone(), count }),
-        },
+        _ => {
+            if let Some(item_stack) = new_inventory.iter_mut().find(|item_stack| item_stack.item == *item) {
+                item_stack.count += count;
+            } else {
+                new_inventory.push(ItemStack { item: item.clone(), count });
+            }
+        }
     }
     new_inventory
+}
+
+pub fn check_inventory(old_state: &State, new_state: &State, expected_inventory: &Vec<ItemStack>) {
+    assert_eq!(new_state.agents[old_state.agent_idx].inventory, *expected_inventory);
+}
+
+pub fn check_error_and_unchanged(old_state: &State, new_state: &State, expected: &str) {
+    let acting_agent_idx = old_state.agent_idx;
+    let old_agent = &old_state.agents[acting_agent_idx];
+    let new_agent = &new_state.agents[acting_agent_idx];
+    assert_eq!(new_agent.error_message, Some(expected.to_string()));
+    assert_eq!(new_agent.open_menu, old_agent.open_menu);
+    assert_eq!(new_agent.node_idx, old_agent.node_idx);
+    
+
+    check_inventory(old_state, new_state, &old_agent.inventory);
 }
 
 pub fn check_body_grids_unchanged(old_state: &State, new_state: &State) {
@@ -73,38 +55,6 @@ pub fn check_body_grids_unchanged(old_state: &State, new_state: &State) {
     }
 }
 
-/// Every agent keeps its node and inventory, except the acting agent when `acting_agent_changes`.
-pub fn check_agents_idle(old_state: &State, new_state: &State, acting_agent_changes: bool) {
-    for (agent_idx, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
-        if acting_agent_changes && agent_idx == old_state.agent_idx { continue; }
-        assert_eq!(old_agent.node_idx, new_agent.node_idx);
-        assert_eq!(old_agent.inventory, new_agent.inventory);
-        assert_eq!(old_agent.open_menu, new_agent.open_menu);
-    }
-}
-
-pub fn check_error_message(new_state: &State, acting_agent_idx: usize, expected: Option<&str>) {
-    let expected_error_msg = expected.map(|error_message| error_message.to_string());
-    assert_eq!(new_state.agents[acting_agent_idx].error_message, expected_error_msg);
-}
-
-/// The acting agent's inventory is exactly `expected_inventory`, and nothing else moved.
-pub fn check_inventory(old_state: &State, new_state: &State, expected_inventory: &Vec<ItemStack>) {
-    let acting_agent_idx = old_state.agent_idx;
-    assert_eq!(new_state.agents[acting_agent_idx].inventory, *expected_inventory);
-    assert_eq!(old_state.agents[acting_agent_idx].node_idx, new_state.agents[acting_agent_idx].node_idx);
-    check_agents_idle(old_state, new_state, true);
-}
-
-/// The acting agent changed nothing about itself but its error message.
-pub fn check_agent_unchanged(old_state: &State, new_state: &State) {
-    let acting_agent_idx = old_state.agent_idx;
-    let old_agent = &old_state.agents[acting_agent_idx];
-    assert_eq!(new_state.agents[acting_agent_idx].open_menu, old_agent.open_menu);
-    check_inventory(old_state, new_state, &old_agent.inventory);
-}
-
-/// Nothing an agent does changes the world: deposits are constant.
 pub fn check_nodes_unchanged(old_state: &State, new_state: &State) {
     assert_eq!(old_state.nodes.len(), new_state.nodes.len());
     for (old_node, new_node) in zip(&old_state.nodes, &new_state.nodes) {

@@ -1,4 +1,4 @@
-use crate::state::state::{State, Input, Action, Message, Item, ItemStack, PointOfInterest, Menu, POI_YIELDS, WORKBENCH_RECIPES};
+use crate::state::state::{State, Input, Action, Message, Item, ItemStack, PointOfInterest, DepositType, Menu};
 use serde_json::from_str;
 
 pub fn flush_state(state: &State) -> (State, String) {
@@ -9,19 +9,19 @@ pub fn flush_state(state: &State) -> (State, String) {
     // the spec cannot be imported from here, so only the label formatting is restated
     let item_label = |item: &Item| match item {
         Item::CrudePickaxe { durability } => format!("CrudePickaxe (durability {durability})"),
-        _ => format!("{:?}", item),
+        _ => format!("{:?}", item)
     };
 
     let mut lines = vec![];
 
-    match agent.open_menu {
+    match &agent.open_menu {
         // an open menu replaces the node view, but the agent still holds items and still hears the room
-        Some(Menu::Workbench) => {
-            lines.push("Workbench: craft or exit".to_string());
+        Some(Menu::CraftingMenu { recipes }) => {
+            lines.push("Crafting menu: craft or exit".to_string());
             lines.push("".to_string());
 
             lines.push("Recipes:".to_string());
-            for (recipe_idx, recipe) in WORKBENCH_RECIPES.iter().enumerate() {
+            for (recipe_idx, recipe) in recipes.iter().enumerate() {
                 let ingredients = recipe.ingredients.iter()
                     .map(|ingredient| format!("{} {}", ingredient.count, item_label(&ingredient.item)))
                     .collect::<Vec<String>>()
@@ -44,19 +44,15 @@ pub fn flush_state(state: &State) -> (State, String) {
 
             lines.push("POIs:".to_string());
             for (poi_idx, poi) in node.pois.iter().enumerate() {
-                let (name, deposit) = match poi {
-                    PointOfInterest::Thornbush { deposit } => ("Thornbush", Some(deposit)),
-                    PointOfInterest::AmberBole { deposit } => ("AmberBole", Some(deposit)),
-                    PointOfInterest::SmoothPebble { deposit } => ("SmoothPebble", Some(deposit)),
-                    PointOfInterest::CopperOreVein { deposit } => ("CopperOreVein", Some(deposit)),
-                    PointOfInterest::RuinedWorkbench => ("RuinedWorkbench", None),
-                };
-                let label = match deposit {
-                    None => name.to_string(),
-                    Some(deposit) => format!(
-                        "{} (exposure {}, stability {}, reserves {})",
-                        name, deposit.exposure, deposit.stability, deposit.reserves
-                    ),
+                let label = match poi {
+                    PointOfInterest::ResourceDeposit { name, type_, exposed, stability, reserves, .. } => {
+                        let type_label = match type_ {
+                            DepositType::Rock => "rock",
+                            DepositType::Forage => "forage"
+                        };
+                        format!("{} ({}, exposed {}, stability {}, reserves {})", name, type_label, exposed, stability, reserves)
+                    }
+                    PointOfInterest::Inspectable { name, .. } => name.clone()
                 };
                 lines.push(format!("[{}] {}", poi_idx, label));
             }
@@ -88,187 +84,147 @@ pub fn flush_state(state: &State) -> (State, String) {
 pub fn next_state(state: &State, input_str: &str) -> State {
     let mut new_state = state.clone();
     let curr_agent_idx = state.agent_idx;
-    let curr_node_idx = state.agents[curr_agent_idx].node_idx;
-    let menu_open = state.agents[curr_agent_idx].open_menu.is_some();
-
-    let item_label = |item: &Item| match item {
-        Item::CrudePickaxe { durability } => format!("CrudePickaxe (durability {durability})"),
-        _ => format!("{:?}", item),
-    };
+    let curr_agent = &state.agents[curr_agent_idx];
+    let curr_node_idx = curr_agent.node_idx;
 
     match from_str::<Input>(input_str) {
         Err(_) => {
             new_state.agents[curr_agent_idx].error_message = Some("could not parse input json".to_string());
         }
         Ok(input) => {
-            new_state.agents[curr_agent_idx].error_message = None;
-
-            match input.action {
+            // each action either succeeds or fails with nothing about the agent changed
+            let result: Result<(), String> = match input.action {
                 Some(Action::MoveTo(_)) | Some(Action::Harvest { .. }) | Some(Action::Inspect { .. })
-                    if menu_open =>
+                    if curr_agent.open_menu.is_some() =>
                 {
-                    new_state.agents[curr_agent_idx].error_message =
-                        Some("you are at the ruined workbench: craft or exit".to_string());
+                    Err("you cannot do that while a menu is open".to_string())
                 }
                 Some(Action::MoveTo(node_name)) => {
                     match state.nodes.iter().position(|node| node.name == node_name) {
-                        Some(target_node_idx) => new_state.agents[curr_agent_idx].node_idx = target_node_idx,
-                        None => {
-                            new_state.agents[curr_agent_idx].error_message =
-                                Some(format!("no node named {node_name}"));
+                        Some(target_node_idx) => {
+                            new_state.agents[curr_agent_idx].node_idx = target_node_idx;
+                            Ok(())
                         }
+                        None => Err(format!("no node named {node_name}"))
                     }
                 }
-                Some(Action::Harvest { poi_idx, tool_idx, uses }) => {
-                    // resolved step by step: the first failure ends the turn with nothing else changed
-                    let error_message = 'harvest: {
-                        let Some(poi) = state.nodes[curr_node_idx].pois.get(poi_idx) else {
-                            break 'harvest Some(format!("no poi at index {poi_idx}"));
-                        };
-                        let (name, deposit) = match poi {
-                            PointOfInterest::Thornbush { deposit } => ("Thornbush", deposit),
-                            PointOfInterest::AmberBole { deposit } => ("AmberBole", deposit),
-                            PointOfInterest::SmoothPebble { deposit } => ("SmoothPebble", deposit),
-                            PointOfInterest::CopperOreVein { deposit } => ("CopperOreVein", deposit),
-                            PointOfInterest::RuinedWorkbench => {
-                                break 'harvest Some("nothing to harvest here".to_string());
-                            }
-                        };
-                        let Some((_, harvested_item, needs_pickaxe)) =
-                            POI_YIELDS.iter().find(|(yield_name, _, _)| *yield_name == name)
-                        else {
-                            break 'harvest Some("nothing to harvest here".to_string());
-                        };
-                        if uses == 0 {
-                            break 'harvest Some("uses must be at least 1".to_string());
-                        }
+                Some(Action::Harvest { poi_idx, tool_idxs }) => 'harvest: {
+                    let Some(poi) = state.nodes[curr_node_idx].pois.get(poi_idx) else {
+                        break 'harvest Err(format!("no poi at index {poi_idx}"));
+                    };
+                    let PointOfInterest::ResourceDeposit { type_, exposed, stability, yield_, .. } = poi else {
+                        break 'harvest Err("cannot harvest this poi".to_string());
+                    };
 
+                    // swings are simulated on a copy; the deposit itself never changes
+                    let (mut exposed, mut stability) = (*exposed, *stability);
+                    let mut total_yield = 0;
+                    let mut tool_uses = vec![0; curr_agent.inventory.len()];
+                    let mut collapsed = false;
+
+                    for tool_idx in tool_idxs {
                         let tool = match tool_idx {
                             None => None,
-                            Some(tool_idx) => {
-                                let Some(item_stack) = state.agents[curr_agent_idx].inventory.get(tool_idx)
-                                else {
-                                    break 'harvest Some(format!("no item at inventory index {tool_idx}"));
-                                };
-                                let is_pickaxe = matches!(item_stack.item, Item::CrudePickaxe { .. });
-                                if !is_pickaxe || !*needs_pickaxe {
-                                    break 'harvest Some(format!(
-                                        "{} is no use here",
-                                        item_label(&item_stack.item)
-                                    ));
-                                }
-                                let Item::CrudePickaxe { durability } = item_stack.item else {
-                                    unreachable!()
-                                };
-                                Some((tool_idx, durability))
+                            Some(idx) => match curr_agent.inventory.get(idx) {
+                                Some(item_stack) => Some(&item_stack.item),
+                                None => break 'harvest Err(format!("no item at inventory index {idx}"))
                             }
                         };
-
-                        if *needs_pickaxe && tool.is_none() {
-                            break 'harvest Some("need a crude pickaxe to mine copper ore".to_string());
-                        }
-                        if let Some((_, durability)) = tool {
-                            if durability < uses {
-                                break 'harvest Some(format!(
-                                    "{} has only {durability} swings left",
-                                    item_label(&Item::CrudePickaxe { durability })
-                                ));
-                            }
+                        let usable = matches!(
+                            (type_, tool),
+                            (DepositType::Forage, None) | (DepositType::Rock, Some(Item::CrudePickaxe { .. }))
+                        );
+                        if !usable {
+                            break 'harvest Err("this tool has no use here".to_string());
                         }
 
-                        // swinging wears the tool whether or not the deposit gives anything back
-                        let inventory = &mut new_state.agents[curr_agent_idx].inventory;
-                        if let Some((tool_idx, durability)) = tool {
-                            let durability_left = durability - uses;
-                            if durability_left == 0 {
-                                inventory.remove(tool_idx);
-                            } else {
-                                inventory[tool_idx] = ItemStack {
-                                    item: Item::CrudePickaxe { durability: durability_left },
-                                    count: 1,
-                                };
-                            }
+                        if exposed > 0 {
+                            exposed -= 1;
+                            stability = stability.saturating_sub(1);
+                            total_yield += 1;
                         }
 
-                        if uses > deposit.stability {
-                            break 'harvest Some(format!(
-                                "too many swings: this takes at most {}",
-                                deposit.stability
-                            ));
+                        // a tool that runs out of durability ends the harvest
+                        if let (Some(idx), Some(Item::CrudePickaxe { durability })) = (tool_idx, tool) {
+                            tool_uses[idx] += 1;
+                            if tool_uses[idx] >= *durability { break; }
                         }
 
-                        let harvested_count = uses.min(deposit.exposure);
-                        if harvested_count > 0 {
-                            match inventory.iter_mut().find(|item_stack| item_stack.item == *harvested_item) {
-                                Some(item_stack) => item_stack.count += harvested_count,
-                                None => inventory.push(ItemStack {
-                                    item: harvested_item.clone(),
-                                    count: harvested_count,
-                                }),
-                            }
+                        if stability == 0 {
+                            collapsed = true;
+                            break;
                         }
-                        None
-                    };
-                    new_state.agents[curr_agent_idx].error_message = error_message;
+                    }
+
+                    let inventory = &mut new_state.agents[curr_agent_idx].inventory;
+                    for (item_stack, uses) in inventory.iter_mut().zip(&tool_uses) {
+                        if let Item::CrudePickaxe { durability } = &mut item_stack.item {
+                            *durability -= uses;
+                        }
+                    }
+                    match inventory.iter_mut().find(|item_stack| item_stack.item == *yield_) {
+                        Some(item_stack) => item_stack.count += total_yield,
+                        None => inventory.push(ItemStack { item: yield_.clone(), count: total_yield })
+                    }
+                    // a pickaxe worn down to nothing breaks
+                    inventory.retain(|item_stack| {
+                        item_stack.count > 0 && !matches!(item_stack.item, Item::CrudePickaxe { durability: 0 })
+                    });
+
+                    if collapsed { Err("deposit collapsed".to_string()) } else { Ok(()) }
                 }
                 Some(Action::Inspect { poi_idx }) => {
                     match state.nodes[curr_node_idx].pois.get(poi_idx) {
-                        None => {
-                            new_state.agents[curr_agent_idx].error_message =
-                                Some(format!("no poi at index {poi_idx}"));
+                        None => Err(format!("no poi at index {poi_idx}")),
+                        Some(PointOfInterest::Inspectable { menu, .. }) => {
+                            new_state.agents[curr_agent_idx].open_menu = Some(menu.clone());
+                            Ok(())
                         }
-                        Some(PointOfInterest::RuinedWorkbench) => {
-                            new_state.agents[curr_agent_idx].open_menu = Some(Menu::Workbench);
-                        }
-                        Some(_) => {
-                            new_state.agents[curr_agent_idx].error_message =
-                                Some("nothing to inspect here".to_string());
-                        }
+                        Some(_) => Err("nothing to inspect here".to_string())
                     }
                 }
-                Some(Action::Craft(recipe_idx)) => {
-                    if !menu_open {
-                        new_state.agents[curr_agent_idx].error_message =
-                            Some("you are not at a workbench".to_string());
-                    } else if let Some(recipe) = WORKBENCH_RECIPES.get(recipe_idx) {
-                        let inventory = &mut new_state.agents[curr_agent_idx].inventory;
-                        let affordable = recipe.ingredients.iter().all(|ingredient| {
-                            inventory.iter()
-                                .find(|item_stack| item_stack.item == ingredient.item)
-                                .map(|item_stack| item_stack.count)
-                                .unwrap_or(0) >= ingredient.count
-                        });
-                        if affordable {
-                            for ingredient in recipe.ingredients {
-                                let item_stack_idx = inventory.iter()
-                                    .position(|item_stack| item_stack.item == ingredient.item)
-                                    .unwrap();
-                                inventory[item_stack_idx].count -= ingredient.count;
-                                if inventory[item_stack_idx].count == 0 {
-                                    inventory.remove(item_stack_idx);
-                                }
+                Some(Action::Craft(recipe_idx)) => 'craft: {
+                    let Some(Menu::CraftingMenu { recipes }) = &curr_agent.open_menu else {
+                        break 'craft Err("crafting menu not open".to_string());
+                    };
+                    let Some(recipe) = recipes.get(recipe_idx) else {
+                        break 'craft Err(format!("no recipe at index {recipe_idx}"));
+                    };
+
+                    let mut inventory = curr_agent.inventory.clone();
+                    for ingredient in &recipe.ingredients {
+                        match inventory.iter_mut().find(|item_stack| item_stack.item == ingredient.item) {
+                            Some(item_stack) if item_stack.count >= ingredient.count => {
+                                item_stack.count -= ingredient.count;
                             }
-                            inventory.push(recipe.output.clone());
-                        } else {
-                            new_state.agents[curr_agent_idx].error_message = Some(format!(
-                                "not enough items to craft {}",
-                                item_label(&recipe.output.item)
-                            ));
+                            _ => break 'craft Err("not enough items to craft recipe".to_string())
                         }
-                    } else {
-                        new_state.agents[curr_agent_idx].error_message =
-                            Some(format!("no recipe at index {recipe_idx}"));
                     }
+                    // pickaxes stay unstacked; every other item joins its existing stack
+                    let existing_stack = match recipe.output.item {
+                        Item::CrudePickaxe { .. } => None,
+                        _ => inventory.iter_mut().find(|item_stack| item_stack.item == recipe.output.item)
+                    };
+                    match existing_stack {
+                        Some(item_stack) => item_stack.count += recipe.output.count,
+                        None => inventory.push(recipe.output.clone())
+                    }
+                    inventory.retain(|item_stack| item_stack.count > 0);
+
+                    new_state.agents[curr_agent_idx].inventory = inventory;
+                    Ok(())
                 }
                 Some(Action::Exit) => {
-                    if menu_open {
+                    if curr_agent.open_menu.is_some() {
                         new_state.agents[curr_agent_idx].open_menu = None;
+                        Ok(())
                     } else {
-                        new_state.agents[curr_agent_idx].error_message = Some("nothing to exit".to_string());
+                        Err("nothing to exit".to_string())
                     }
                 }
-                None => {}
-            }
+                None => Ok(())
+            };
+            new_state.agents[curr_agent_idx].error_message = result.err();
 
             if let Some(content) = input.send_message {
                 // the message reaches whoever shared the node at the start of the turn
@@ -276,7 +232,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                     if state.agents[agent_idx].node_idx != curr_node_idx { continue; }
                     agent.node_messages_inbox.push(Message {
                         sender_agent_idx: curr_agent_idx,
-                        content: content.clone(),
+                        content: content.clone()
                     });
                 }
             }

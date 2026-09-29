@@ -16,3 +16,4 @@ Unless i say otherwise, follow these rules:
 
 If you think something is inconsistent/wrong with the spec, say so.
 Unless i say otherwise, if i say "commit", always commit all changes.
+No trailing commas

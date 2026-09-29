@@ -1,106 +1,145 @@
-use crate::state::state::{State, Item, ItemStack};
-use crate::spec::common::{
-    check_agent_unchanged, check_error_message, check_inventory, inventory_with,
-    item_label, poi_deposit, poi_yield,
-};
+use crate::state::state::{State, PointOfInterest, Item, ItemStack, DepositType};
+use crate::spec::common::{check_error_and_unchanged, item_label};
+use std::collections::{HashMap};
+use std::iter::zip;
 
-pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_idx: Option<usize>, uses: usize) {
+pub fn tool_deposit_type(item: Option<&Item>) -> Option<DepositType> {
+    match item {
+        Some(Item::CrudePickaxe { .. }) => Some(DepositType::Rock),
+        None => Some(DepositType::Forage),
+        _ => None,
+    }
+}
+
+pub fn tool_durability(item: &Item) -> usize {
+    match item {
+        Item::CrudePickaxe { durability } => *durability,
+        _ => panic!("{} is not a tool. this shouldn't be reachable", item_label(item)),
+    }
+}
+
+pub fn update_tool_durability(item: &mut Item, uses: usize) {
+    match item {
+        Item::CrudePickaxe { durability } => {
+            *durability -= uses;
+        }
+        _ => {}
+    }
+}
+
+struct DepositState {
+    exposed: usize,
+    stability: usize,
+    reserves: usize,
+    total_yield: usize
+}
+
+impl DepositState {
+    fn update(&mut self, tool: Option<&Item>) {
+        match tool {
+            Some(Item::CrudePickaxe { .. }) | None => {
+                if self.exposed > 0 {
+                    self.exposed -= 1;
+                    self.stability -= 1;
+                    self.total_yield += 1;
+                }
+                
+            },
+            _ => {}
+        }
+    }
+}
+
+pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_idxs: Vec<Option<usize>>) {
     let acting_agent_idx = old_state.agent_idx;
     let acting_agent = &old_state.agents[acting_agent_idx];
-    let pois = &old_state.nodes[acting_agent.node_idx].pois;
 
-    // a harvest never opens or closes a menu
-    assert_eq!(new_state.agents[acting_agent_idx].open_menu, acting_agent.open_menu);
-
-    let Some(poi) = pois.get(poi_idx) else {
-        check_error_message(new_state, acting_agent_idx, Some(&format!("no poi at index {poi_idx}")));
-        check_agent_unchanged(old_state, new_state);
+    let Some(poi) = old_state.nodes[acting_agent.node_idx].pois.get(poi_idx) else {
+        check_error_and_unchanged(old_state, new_state, &format!("no poi at index {poi_idx}"));
         return;
     };
 
-    let (Some(deposit), Some((harvested_item, needs_pickaxe))) = (poi_deposit(poi), poi_yield(poi)) else {
-        check_error_message(new_state, acting_agent_idx, Some("nothing to harvest here"));
-        check_agent_unchanged(old_state, new_state);
+    let PointOfInterest::ResourceDeposit { name: _, type_, exposed, stability, reserves, yield_ } = poi else { 
+        check_error_and_unchanged(old_state, new_state, "cannot harvest this poi");
         return;
     };
 
-    if uses == 0 {
-        check_error_message(new_state, acting_agent_idx, Some("uses must be at least 1"));
-        check_agent_unchanged(old_state, new_state);
-        return;
-    }
+    let mut state = DepositState {
+        exposed: *exposed,
+        stability: *stability,
+        reserves: *reserves,
+        total_yield: 0
+    };
+    let mut tool_uses = HashMap::<usize, usize>::new();
+    let mut collapsed = false;
 
-    let tool = match tool_idx {
-        None => None,
-        Some(tool_idx) => {
-            let Some(item_stack) = acting_agent.inventory.get(tool_idx) else {
-                check_error_message(new_state, acting_agent_idx, Some(&format!("no item at inventory index {tool_idx}")));
-                check_agent_unchanged(old_state, new_state);
+    for tool_idx in tool_idxs {
+        let tool = if let Some(idx) = tool_idx {
+            let Some(item_stack) = acting_agent.inventory.get(idx) else {
+                check_error_and_unchanged(old_state, new_state, &format!("no item at inventory index {idx}"));
                 return;
             };
-            // the only tool in the game is the pickaxe, and it only bites on a vein
-            let useful = matches!(item_stack.item, Item::CrudePickaxe { .. }) && needs_pickaxe;
-            if !useful {
-                check_error_message(
-                    new_state,
-                    acting_agent_idx,
-                    Some(&format!("{} is no use here", item_label(&item_stack.item))),
-                );
-                check_agent_unchanged(old_state, new_state);
-                return;
-            }
-            let Item::CrudePickaxe { durability } = item_stack.item else { unreachable!() };
-            Some((tool_idx, durability))
-        }
-    };
-
-    if needs_pickaxe && tool.is_none() {
-        check_error_message(new_state, acting_agent_idx, Some("need a crude pickaxe to mine copper ore"));
-        check_agent_unchanged(old_state, new_state);
-        return;
-    }
-
-    if let Some((_, durability)) = tool {
-        if durability < uses {
-            check_error_message(
-                new_state,
-                acting_agent_idx,
-                Some(&format!(
-                    "{} has only {durability} swings left",
-                    item_label(&Item::CrudePickaxe { durability })
-                )),
-            );
-            check_agent_unchanged(old_state, new_state);
+            Some(&item_stack.item)
+        } else { None };
+        if Some(type_) != tool_deposit_type(tool).as_ref() {
+            check_error_and_unchanged(old_state, new_state, &format!("this tool has no use here"));
             return;
         }
-    }
+        
+        state.update(tool);
+        if let Some(idx) = tool_idx {
+            let uses = tool_uses.entry(idx).or_insert(0);
+            *uses += 1;
 
-    // swinging always wears the tool, whether or not the deposit gives anything back
+            if *uses >= tool_durability(&tool.unwrap()) {
+                break;
+            }
+        }
+
+        if state.stability <= 0 {
+            collapsed = true;
+            break;
+        }
+    };
+
+    let mut yield_in_inventory = false;
     let mut expected_inventory = acting_agent.inventory.clone();
-    if let Some((tool_idx, durability)) = tool {
-        let durability_left = durability - uses;
-        if durability_left == 0 {
-            expected_inventory.remove(tool_idx);
-        } else {
-            expected_inventory[tool_idx] = ItemStack {
-                item: Item::CrudePickaxe { durability: durability_left },
-                count: 1,
-            };
+    for (i, item_stack) in expected_inventory.iter_mut().enumerate() {
+        if tool_uses.contains_key(&i) {
+            update_tool_durability(&mut item_stack.item, tool_uses[&i]);
+        }
+        if &item_stack.item == yield_ {
+            item_stack.count += state.total_yield;
+            yield_in_inventory = true;
         }
     }
+    if !yield_in_inventory {
+        let new_item_stack = ItemStack {
+            item: yield_.clone(),
+            count: state.total_yield,
+        };
+        expected_inventory.push(new_item_stack);
+    }
+    
+    // a pickaxe worn down to nothing breaks
+    expected_inventory.retain(|item_stack| {
+        item_stack.count > 0 && !matches!(item_stack.item, Item::CrudePickaxe { durability: 0 })
+    });
 
-    if uses > deposit.stability {
-        check_error_message(
-            new_state,
-            acting_agent_idx,
-            Some(&format!("too many swings: this takes at most {}", deposit.stability)),
-        );
-        check_inventory(old_state, new_state, &expected_inventory);
-        return;
+    for (i, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
+        if i == acting_agent_idx {
+            assert_eq!(new_agent.inventory, expected_inventory);
+            if collapsed {
+                assert_eq!(new_agent.error_message, Some(format!("deposit collapsed")));
+            } else {
+                assert_eq!(new_agent.error_message, None);
+            }
+        } else {
+            assert_eq!(new_agent.inventory, old_agent.inventory);
+            assert_eq!(new_agent.error_message, old_agent.error_message);
+        }
+        assert_eq!(new_agent.open_menu, old_agent.open_menu);
+        assert_eq!(new_agent.node_idx, old_agent.node_idx);
     }
 
-    let harvested_count = uses.min(deposit.exposure);
-    let expected_inventory = inventory_with(&expected_inventory, &harvested_item, harvested_count);
-    check_error_message(new_state, acting_agent_idx, None);
-    check_inventory(old_state, new_state, &expected_inventory);
 }

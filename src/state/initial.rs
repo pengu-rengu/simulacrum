@@ -1,4 +1,4 @@
-use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell, PointOfInterest, Deposit};
+use crate::state::state::{Agent, BodyCell, BodyGrid, DepositType, Item, ItemStack, Menu, Node, PointOfInterest, Recipe, State};
 
 fn initial_body_grid() -> BodyGrid {
     BodyGrid {
@@ -38,22 +38,59 @@ impl State {
                     name: "Sapwell Hollow".to_string(),
                     biome: "Amberwood thicket".to_string(),
                     pois: vec![
-                        PointOfInterest::Thornbush { deposit: Deposit { exposure: 3, stability: 4, reserves: 20 } },
-                        PointOfInterest::AmberBole { deposit: Deposit { exposure: 2, stability: 3, reserves: 12 } },
-                        PointOfInterest::SmoothPebble { deposit: Deposit { exposure: 4, stability: 6, reserves: 30 } },
-                        PointOfInterest::RuinedWorkbench,
-                    ],
+                        PointOfInterest::ResourceDeposit { 
+                            name: "Thornbush".to_string(),
+                            type_: DepositType::Forage,
+                            exposed: 2,
+                            stability: 4,
+                            reserves: 20,
+                            yield_: Item::Stick
+                        },
+                        PointOfInterest::ResourceDeposit {
+                            name: "Amber Bole".to_string(),
+                            type_: DepositType::Forage,
+                            exposed: 2,
+                            stability: 3,
+                            reserves: 15,
+                            yield_: Item::Resin
+                        },
+                        PointOfInterest::ResourceDeposit {
+                            name: "Smooth Pebble".to_string(),
+                            type_: DepositType::Forage,
+                            exposed: 4,
+                            stability: 6,
+                            reserves: 30,
+                            yield_: Item::SmoothPebble
+                        },
+                        PointOfInterest::Inspectable {
+                            name: "Ruined Workbench".to_string(),
+                            menu: Menu::CraftingMenu { recipes: vec![Recipe {
+                                output: ItemStack { item: Item::CrudePickaxe { 
+                                    durability: 20
+                                }, count: 1 },
+                                ingredients: vec![
+                                    ItemStack { item: Item::Stick, count: 10 },
+                                    ItemStack { item: Item::SmoothPebble, count: 10 },
+                                ],
+                            }]}
+                        },
+                    ]
                 },
                 Node {
                     name: "Amberveins".to_string(),
                     biome: "Amberwood thicket".to_string(),
                     pois: vec![
-                        PointOfInterest::CopperOreVein { deposit: Deposit { exposure: 2, stability: 5, reserves: 8 } },
-                        PointOfInterest::Thornbush { deposit: Deposit { exposure: 1, stability: 2, reserves: 6 } },
-                        PointOfInterest::SmoothPebble { deposit: Deposit { exposure: 4, stability: 6, reserves: 30 } },
-                    ],
-                },
-            ],
+                        PointOfInterest::ResourceDeposit {
+                            name: "Copper Ore Vein".to_string(),
+                            type_: DepositType::Rock,
+                            exposed: 2,
+                            stability: 5,
+                            reserves: 8,
+                            yield_: Item::CopperOre
+                        }
+                    ]
+                }
+            ]
         }
     }
 }

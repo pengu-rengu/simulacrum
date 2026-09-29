@@ -12,26 +12,6 @@ pub struct Agent {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum Menu {
-    Workbench
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Recipe {
-    pub output: ItemStack,
-    pub ingredients: &'static [ItemStack]
-}
-
-pub const WORKBENCH_RECIPES: &[Recipe] = &[Recipe {
-    output: ItemStack { item: Item::CrudePickaxe { durability: 20 }, count: 1 },
-    ingredients: &[
-        ItemStack { item: Item::Stick, count: 10 },
-        ItemStack { item: Item::SmoothPebble, count: 10 },
-    ],
-}];
-
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum Item {
     Stick,
     Resin,
@@ -74,27 +54,35 @@ pub struct Node {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum PointOfInterest {
-    Thornbush { deposit: Deposit},
-    AmberBole { deposit: Deposit},
-    SmoothPebble { deposit: Deposit},
-    CopperOreVein { deposit: Deposit},
-    RuinedWorkbench
+    ResourceDeposit {
+        name: String,
+        type_: DepositType,
+        exposed: usize,
+        stability: usize,
+        reserves: usize,
+        yield_: Item,
+    },
+    Inspectable {
+        name: String,
+        menu: Menu
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct Deposit {
-    pub exposure: usize,
-    pub stability: usize,
-    pub reserves: usize
+pub enum DepositType {
+    Rock, Forage
 }
 
-/// What one swing yields, and whether it needs a pickaxe. A poi absent here cannot be harvested.
-pub const POI_YIELDS: &[(&str, Item, bool)] = &[
-    ("Thornbush", Item::Stick, false),
-    ("AmberBole", Item::Resin, false),
-    ("SmoothPebble", Item::SmoothPebble, false),
-    ("CopperOreVein", Item::CopperOre, true),
-];
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum Menu {
+    CraftingMenu { recipes: Vec<Recipe> }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct Recipe {
+    pub output: ItemStack,
+    pub ingredients: Vec<ItemStack>
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct State {
@@ -108,7 +96,7 @@ pub struct State {
 #[serde(rename_all = "snake_case")]
 pub enum Action {
     MoveTo(String),
-    Harvest { poi_idx: usize, tool_idx: Option<usize>, uses: usize },
+    Harvest { poi_idx: usize, tool_idxs: Vec<Option<usize>> },
     Inspect { poi_idx: usize },
     Craft(usize),
     Exit
