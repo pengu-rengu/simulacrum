@@ -72,6 +72,25 @@ impl State {
                                     ItemStack { item: Item::Stick, count: 10 },
                                     ItemStack { item: Item::SmoothPebble, count: 10 },
                                 ],
+                            },
+                            Recipe {
+                                output: ItemStack { item: Item::CopperPickaxe {
+                                    durability: 40
+                                }, count: 1 },
+                                ingredients: vec![
+                                    ItemStack { item: Item::CopperOre, count: 5 },
+                                    ItemStack { item: Item::Stick, count: 5 }
+                                ]
+                            },
+                            Recipe {
+                                output: ItemStack { item: Item::CopperDrill {
+                                    durability: 20
+                                }, count: 1 },
+                                ingredients: vec![
+                                    ItemStack { item: Item::CopperOre, count: 8 },
+                                    ItemStack { item: Item::Resin, count: 3 },
+                                    ItemStack { item: Item::Stick, count: 5 }
+                                ]
                             }]}
                         },
                     ]
@@ -84,7 +103,7 @@ impl State {
                             name: "Copper Ore Vein".to_string(),
                             type_: DepositType::Rock,
                             exposed: 2,
-                            stability: 5,
+                            stability: 10,
                             reserves: 8,
                             yield_: Item::CopperOre
                         }

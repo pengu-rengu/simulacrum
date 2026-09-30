@@ -1,6 +1,7 @@
 use crate::spec::spec::{check_next_state, check_flush_state};
 use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell, Item, ItemStack, PointOfInterest, DepositType, Menu, Recipe};
 use crate::impl_::next_state::{flush_state, next_state};
+use crate::spec::common::tool_durability;
 use std::{
     iter::zip,
     collections::HashSet
@@ -10,9 +11,10 @@ fn mock_states() -> Vec<State> {
     let contents = ["hi", "", "line1\nline2", "with \"quotes\""];
     let mut base_states = vec![State::new()];
 
-    // (exposed, stability): nothing exposed, collapses on the first swing,
-    // runs out of exposure before stability, and collapses mid-harvest
-    let deposit_kinds = [(0, 3), (2, 1), (2, 4), (4, 2)];
+    // (exposed, stability, reserves): nothing exposed, collapses on the first swing,
+    // runs out of exposure before stability, collapses mid-harvest, the real copper vein,
+    // only reachable by drilling (and drilled dry), and nothing left to drill
+    let deposit_kinds = [(0, 3, 8), (2, 1, 8), (2, 4, 8), (4, 2, 8), (2, 10, 8), (0, 16, 3), (1, 12, 0)];
     let workbench_menu = Menu::CraftingMenu {
         recipes: vec![
             Recipe {
@@ -26,6 +28,21 @@ fn mock_states() -> Vec<State> {
             Recipe {
                 output: ItemStack { item: Item::Resin, count: 1 },
                 ingredients: vec![ItemStack { item: Item::Stick, count: 2 }]
+            },
+            Recipe {
+                output: ItemStack { item: Item::CopperPickaxe { durability: 40 }, count: 1 },
+                ingredients: vec![
+                    ItemStack { item: Item::CopperOre, count: 5 },
+                    ItemStack { item: Item::Stick, count: 5 }
+                ]
+            },
+            Recipe {
+                output: ItemStack { item: Item::CopperDrill { durability: 20 }, count: 1 },
+                ingredients: vec![
+                    ItemStack { item: Item::CopperOre, count: 8 },
+                    ItemStack { item: Item::Resin, count: 3 },
+                    ItemStack { item: Item::Stick, count: 5 }
+                ]
             }
         ]
     };
@@ -38,10 +55,11 @@ fn mock_states() -> Vec<State> {
             for shift in 0..num_nodes {
                 for agent_idx in 0..num_agents {
                     // 0: nothing, 1: enough to craft, 2: holds a pickaxe, 3: partial materials,
-                    // 4: enough to craft while already holding identical pickaxes and resin
-                    for inventory_kind in 0..5 {
+                    // 4: enough to craft while already holding identical pickaxes and resin,
+                    // 5: copper tools, 6: enough to craft both copper tools, 7: one tool of each tier
+                    for inventory_kind in 0..8 {
                     // the acting agent is either in the node view or standing at the workbench menu
-                    for (exposed, stability) in deposit_kinds {
+                    for (exposed, stability, reserves) in deposit_kinds {
                     for open_menu in [None, Some(workbench_menu.clone())] {
                     for has_error in [false, true] {
                         let agents = (0..num_agents).map(|a| Agent {
@@ -85,12 +103,30 @@ fn mock_states() -> Vec<State> {
                                     ItemStack { item: Item::Stick, count: 10 },
                                     ItemStack { item: Item::SmoothPebble, count: 9 }
                                 ],
-                                _ => vec![
+                                4 => vec![
                                     ItemStack { item: Item::Stick, count: 10 },
                                     ItemStack { item: Item::SmoothPebble, count: 10 },
                                     ItemStack { item: Item::Resin, count: 3 },
                                     ItemStack { item: Item::CrudePickaxe { durability: 20 }, count: 1 },
                                     ItemStack { item: Item::CrudePickaxe { durability: 20 }, count: 1 }
+                                ],
+                                // same layout as 2 at indices 0-2, with a fresh and a worn drill after
+                                5 => vec![
+                                    ItemStack { item: Item::CopperPickaxe { durability: 1 }, count: 1 },
+                                    ItemStack { item: Item::Resin, count: 3 },
+                                    ItemStack { item: Item::CopperPickaxe { durability: 40 }, count: 1 },
+                                    ItemStack { item: Item::CopperDrill { durability: 20 }, count: 1 },
+                                    ItemStack { item: Item::CopperDrill { durability: 1 }, count: 1 }
+                                ],
+                                6 => vec![
+                                    ItemStack { item: Item::Stick, count: 10 },
+                                    ItemStack { item: Item::CopperOre, count: 13 },
+                                    ItemStack { item: Item::Resin, count: 3 }
+                                ],
+                                _ => vec![
+                                    ItemStack { item: Item::CrudePickaxe { durability: 20 }, count: 1 },
+                                    ItemStack { item: Item::CopperPickaxe { durability: 40 }, count: 1 },
+                                    ItemStack { item: Item::CopperDrill { durability: 20 }, count: 1 }
                                 ]
                             },
                             // only the acting agent opens a menu, and only where a workbench stands
@@ -110,10 +146,10 @@ fn mock_states() -> Vec<State> {
                                 biome: "Amberwood thicket".to_string(),
                                 pois: if n == 0 {
                                     vec![
-                                        deposit("Thornbush", DepositType::Forage, exposed, stability, 20, Item::Stick),
-                                        deposit("Amber Bole", DepositType::Forage, exposed, stability, 12, Item::Resin),
-                                        deposit("Smooth Pebble", DepositType::Forage, exposed, stability, 30, Item::SmoothPebble),
-                                        deposit("Copper Ore Vein", DepositType::Rock, exposed, stability, 8, Item::CopperOre),
+                                        deposit("Thornbush", DepositType::Forage, exposed, stability, reserves, Item::Stick),
+                                        deposit("Amber Bole", DepositType::Forage, exposed, stability, reserves, Item::Resin),
+                                        deposit("Smooth Pebble", DepositType::Forage, exposed, stability, reserves, Item::SmoothPebble),
+                                        deposit("Copper Ore Vein", DepositType::Rock, exposed, stability, reserves, Item::CopperOre),
                                         PointOfInterest::Inspectable {
                                             name: "Ruined Workbench".to_string(),
                                             menu: workbench_menu.clone()
@@ -133,10 +169,10 @@ fn mock_states() -> Vec<State> {
         }
     }
 
-    // check() zips states with inputs, so repeat each state 50 times;
-    // mock_input_strs() cycles its 50 inputs, pairing every state with every input
+    // check() zips states with inputs, so repeat each state 64 times;
+    // mock_input_strs() cycles its 64 inputs, pairing every state with every input
     base_states.into_iter()
-        .flat_map(|state| std::iter::repeat_n(state, 50))
+        .flat_map(|state| std::iter::repeat_n(state, 64))
         .collect()
 }
 
@@ -181,6 +217,20 @@ fn mock_input_strs() -> Vec<String> {
         // a bad tool after a good swing, unless the deposit collapsed first
         serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idxs": [2, 99] } } }).to_string(),
         serde_json::json!({ "action": { "harvest": { "poi_idx": 0, "tool_idxs": [null, 2] } } }).to_string(),
+        // drilling: index 3 is a fresh drill and 4 a worn one with copper tools,
+        // while with one tool of each tier 0 is crude, 1 copper, 2 the drill
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idxs": [3] } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idxs": [3, 3, 2, 2, 2] } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idxs": [3, 3, 3, 3, 2, 2, 2, 2, 2] } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idxs": [3, 2, 3, 2, 3, 2, 3, 2] } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idxs": [4, 4] } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idxs": [4, 2, 2] } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idxs": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3] } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 1, "tool_idxs": [3] } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idxs": [0, 1] } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idxs": [1, 0] } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idxs": [2, 2, 1, 1, 1, 0] } } }).to_string(),
+        serde_json::json!({ "action": { "harvest": { "poi_idx": 3, "tool_idxs": [2, 0, 2, 0] } } }).to_string(),
         // inspect
         serde_json::json!({ "action": { "inspect": { "poi_idx": 4 } } }).to_string(),
         serde_json::json!({ "action": { "inspect": { "poi_idx": 0 } } }).to_string(),
@@ -194,6 +244,8 @@ fn mock_input_strs() -> Vec<String> {
         // menu
         serde_json::json!({ "action": { "craft": 0 } }).to_string(),
         serde_json::json!({ "action": { "craft": 1 } }).to_string(),
+        serde_json::json!({ "action": { "craft": 2 } }).to_string(),
+        serde_json::json!({ "action": { "craft": 3 } }).to_string(),
         serde_json::json!({ "action": { "craft": 9 } }).to_string(),
         serde_json::json!({ "action": "exit" }).to_string(),
         // action plus message
@@ -226,17 +278,17 @@ fn assumptions(state: &State) {
         }
 
         for item_stack in &agent.inventory {
-            if let Item::CrudePickaxe { durability } = item_stack.item {
+            if let Some(durability) = tool_durability(&item_stack.item) {
                 assert!(durability > 0);
                 assert!(item_stack.count == 1);
             }
         }
 
         let items = agent.inventory.iter().map(|item_stack| &item_stack.item).collect::<Vec<&Item>>();
-        // pickaxes stay unstacked; every other item has one stack
+        // tools stay unstacked; every other item has one stack
         for item_stack in &agent.inventory {
             assert!(item_stack.count > 0);
-            if !matches!(item_stack.item, Item::CrudePickaxe { .. }) {
+            if tool_durability(&item_stack.item).is_none() {
                 assert_eq!(items.iter().filter(|item| ***item == item_stack.item).count(), 1);
             }
         }

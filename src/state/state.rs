@@ -17,7 +17,9 @@ pub enum Item {
     Resin,
     SmoothPebble,
     CopperOre,
-    CrudePickaxe { durability: usize }
+    CrudePickaxe { durability: usize },
+    CopperPickaxe { durability: usize },
+    CopperDrill { durability: usize }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

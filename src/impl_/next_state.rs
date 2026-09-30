@@ -9,6 +9,8 @@ pub fn flush_state(state: &State) -> (State, String) {
     // the spec cannot be imported from here, so only the label formatting is restated
     let item_label = |item: &Item| match item {
         Item::CrudePickaxe { durability } => format!("CrudePickaxe (durability {durability})"),
+        Item::CopperPickaxe { durability } => format!("CopperPickaxe (durability {durability})"),
+        Item::CopperDrill { durability } => format!("CopperDrill (durability {durability})"),
         _ => format!("{:?}", item)
     };
 
@@ -112,12 +114,12 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                     let Some(poi) = state.nodes[curr_node_idx].pois.get(poi_idx) else {
                         break 'harvest Err(format!("no poi at index {poi_idx}"));
                     };
-                    let PointOfInterest::ResourceDeposit { type_, exposed, stability, yield_, .. } = poi else {
+                    let PointOfInterest::ResourceDeposit { type_, exposed, stability, reserves, yield_, .. } = poi else {
                         break 'harvest Err("cannot harvest this poi".to_string());
                     };
 
                     // swings are simulated on a copy; the deposit itself never changes
-                    let (mut exposed, mut stability) = (*exposed, *stability);
+                    let (mut exposed, mut stability, mut reserves) = (*exposed, *stability, *reserves);
                     let mut total_yield = 0;
                     let mut tool_uses = vec![0; curr_agent.inventory.len()];
                     let mut collapsed = false;
@@ -130,45 +132,63 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                                 None => break 'harvest Err(format!("no item at inventory index {idx}"))
                             }
                         };
-                        let usable = matches!(
-                            (type_, tool),
-                            (DepositType::Forage, None) | (DepositType::Rock, Some(Item::CrudePickaxe { .. }))
-                        );
-                        if !usable {
-                            break 'harvest Err("this tool has no use here".to_string());
-                        }
+                        // digging tools take an exposed unit at a stability cost; the drill exposes one from reserves
+                        let (stability_cost, durability) = match (type_, tool) {
+                            (DepositType::Forage, None) => (1, None),
+                            (DepositType::Rock, Some(Item::CrudePickaxe { durability })) => (5, Some(*durability)),
+                            (DepositType::Rock, Some(Item::CopperPickaxe { durability })) => (3, Some(*durability)),
+                            (DepositType::Rock, Some(Item::CopperDrill { durability })) => (0, Some(*durability)),
+                            _ => break 'harvest Err("this tool has no use here".to_string())
+                        };
 
-                        if exposed > 0 {
+                        if matches!(tool, Some(Item::CopperDrill { .. })) {
+                            if reserves > 0 {
+                                reserves -= 1;
+                                exposed += 1;
+                            }
+                        } else if exposed > 0 {
                             exposed -= 1;
-                            stability = stability.saturating_sub(1);
+                            stability = stability.saturating_sub(stability_cost);
                             total_yield += 1;
                         }
-
-                        // a tool that runs out of durability ends the harvest
-                        if let (Some(idx), Some(Item::CrudePickaxe { durability })) = (tool_idx, tool) {
+                        if let Some(idx) = tool_idx {
                             tool_uses[idx] += 1;
-                            if tool_uses[idx] >= *durability { break; }
                         }
 
+                        // a collapse wins even on the swing that wears the tool out
                         if stability == 0 {
                             collapsed = true;
                             break;
+                        }
+
+                        // a tool that runs out of durability ends the harvest
+                        if let (Some(idx), Some(durability)) = (tool_idx, durability) {
+                            if tool_uses[idx] >= durability { break; }
                         }
                     }
 
                     let inventory = &mut new_state.agents[curr_agent_idx].inventory;
                     for (item_stack, uses) in inventory.iter_mut().zip(&tool_uses) {
-                        if let Item::CrudePickaxe { durability } = &mut item_stack.item {
+                        if let Item::CrudePickaxe { durability }
+                            | Item::CopperPickaxe { durability }
+                            | Item::CopperDrill { durability } = &mut item_stack.item
+                        {
                             *durability -= uses;
                         }
                     }
-                    match inventory.iter_mut().find(|item_stack| item_stack.item == *yield_) {
-                        Some(item_stack) => item_stack.count += total_yield,
-                        None => inventory.push(ItemStack { item: yield_.clone(), count: total_yield })
+                    // a collapse buries everything the harvest dug up
+                    if !collapsed {
+                        match inventory.iter_mut().find(|item_stack| item_stack.item == *yield_) {
+                            Some(item_stack) => item_stack.count += total_yield,
+                            None => inventory.push(ItemStack { item: yield_.clone(), count: total_yield })
+                        }
                     }
-                    // a pickaxe worn down to nothing breaks
+                    // a tool worn down to nothing breaks
                     inventory.retain(|item_stack| {
-                        item_stack.count > 0 && !matches!(item_stack.item, Item::CrudePickaxe { durability: 0 })
+                        item_stack.count > 0 && !matches!(
+                            item_stack.item,
+                            Item::CrudePickaxe { durability: 0 } | Item::CopperPickaxe { durability: 0 } | Item::CopperDrill { durability: 0 }
+                        )
                     });
 
                     if collapsed { Err("deposit collapsed".to_string()) } else { Ok(()) }
@@ -200,9 +220,9 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                             _ => break 'craft Err("not enough items to craft recipe".to_string())
                         }
                     }
-                    // pickaxes stay unstacked; every other item joins its existing stack
+                    // tools stay unstacked; every other item joins its existing stack
                     let existing_stack = match recipe.output.item {
-                        Item::CrudePickaxe { .. } => None,
+                        Item::CrudePickaxe { .. } | Item::CopperPickaxe { .. } | Item::CopperDrill { .. } => None,
                         _ => inventory.iter_mut().find(|item_stack| item_stack.item == recipe.output.item)
                     };
                     match existing_stack {

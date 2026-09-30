@@ -1,40 +1,38 @@
-use crate::state::state::{State, Item, ItemStack, PointOfInterest};
+use crate::state::state::{State, Item, ItemStack};
 use std::iter::zip;
+
+/// Durability of a tool, or None for items that are not tools.
+pub fn tool_durability(item: &Item) -> Option<usize> {
+    match item {
+        Item::CrudePickaxe { durability }
+        | Item::CopperPickaxe { durability }
+        | Item::CopperDrill { durability } => Some(*durability),
+        _ => None
+    }
+}
 
 pub fn item_label(item: &Item) -> String {
     match item {
         Item::CrudePickaxe { durability } => format!("CrudePickaxe (durability {durability})"),
+        Item::CopperPickaxe { durability } => format!("CopperPickaxe (durability {durability})"),
+        Item::CopperDrill { durability } => format!("CopperDrill (durability {durability})"),
         _ => format!("{:?}", item),
     }
 }
 
-pub fn item_count(agent_inventory: &Vec<ItemStack>, item: &Item) -> usize {
-    agent_inventory.iter()
-        .find(|item_stack| item_stack.item == *item)
-        .map(|item_stack| item_stack.count)
-        .unwrap_or(0)
-}
-
-/// `count` of `item` added to `inventory`, keeping tools unstacked and one stack per other item.
 pub fn inventory_with(inventory: &Vec<ItemStack>, item: &Item, count: usize) -> Vec<ItemStack> {
     let mut new_inventory = inventory.clone();
     if count == 0 { return new_inventory; }
 
-    match item {
-        Item::CrudePickaxe { .. } => new_inventory.push(ItemStack { item: item.clone(), count }),
-        _ => {
-            if let Some(item_stack) = new_inventory.iter_mut().find(|item_stack| item_stack.item == *item) {
-                item_stack.count += count;
-            } else {
-                new_inventory.push(ItemStack { item: item.clone(), count });
-            }
-        }
+    // tools stay unstacked
+    if tool_durability(item).is_some() {
+        new_inventory.push(ItemStack { item: item.clone(), count });
+    } else if let Some(item_stack) = new_inventory.iter_mut().find(|item_stack| item_stack.item == *item) {
+        item_stack.count += count;
+    } else {
+        new_inventory.push(ItemStack { item: item.clone(), count });
     }
     new_inventory
-}
-
-pub fn check_inventory(old_state: &State, new_state: &State, expected_inventory: &Vec<ItemStack>) {
-    assert_eq!(new_state.agents[old_state.agent_idx].inventory, *expected_inventory);
 }
 
 pub fn check_error_and_unchanged(old_state: &State, new_state: &State, expected: &str) {
@@ -44,9 +42,7 @@ pub fn check_error_and_unchanged(old_state: &State, new_state: &State, expected:
     assert_eq!(new_agent.error_message, Some(expected.to_string()));
     assert_eq!(new_agent.open_menu, old_agent.open_menu);
     assert_eq!(new_agent.node_idx, old_agent.node_idx);
-    
-
-    check_inventory(old_state, new_state, &old_agent.inventory);
+    assert_eq!(new_agent.inventory, old_agent.inventory);
 }
 
 pub fn check_body_grids_unchanged(old_state: &State, new_state: &State) {

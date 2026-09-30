@@ -1,26 +1,21 @@
 use crate::state::state::{State, PointOfInterest, Item, ItemStack, DepositType};
-use crate::spec::common::{check_error_and_unchanged, item_label};
+use crate::spec::common::{check_error_and_unchanged, tool_durability};
 use std::collections::{HashMap};
 use std::iter::zip;
 
 pub fn tool_deposit_type(item: Option<&Item>) -> Option<DepositType> {
     match item {
-        Some(Item::CrudePickaxe { .. }) => Some(DepositType::Rock),
+        Some(Item::CrudePickaxe { .. } | Item::CopperPickaxe { .. } | Item::CopperDrill { .. }) => Some(DepositType::Rock),
         None => Some(DepositType::Forage),
-        _ => None,
-    }
-}
-
-pub fn tool_durability(item: &Item) -> usize {
-    match item {
-        Item::CrudePickaxe { durability } => *durability,
-        _ => panic!("{} is not a tool. this shouldn't be reachable", item_label(item)),
+        _ => None
     }
 }
 
 pub fn update_tool_durability(item: &mut Item, uses: usize) {
     match item {
-        Item::CrudePickaxe { durability } => {
+        Item::CrudePickaxe { durability }
+        | Item::CopperPickaxe { durability }
+        | Item::CopperDrill { durability } => {
             *durability -= uses;
         }
         _ => {}
@@ -35,17 +30,26 @@ struct DepositState {
 }
 
 impl DepositState {
+    /// One swing. Digging takes an exposed unit at a stability cost; drilling exposes a unit from reserves.
+    /// A swing with nothing to act on does nothing, but still wears the tool.
     fn update(&mut self, tool: Option<&Item>) {
-        match tool {
-            Some(Item::CrudePickaxe { .. }) | None => {
-                if self.exposed > 0 {
-                    self.exposed -= 1;
-                    self.stability -= 1;
-                    self.total_yield += 1;
+        let stability_cost = match tool {
+            None => 1,
+            Some(Item::CrudePickaxe { .. }) => 5,
+            Some(Item::CopperPickaxe { .. }) => 3,
+            Some(Item::CopperDrill { .. }) => {
+                if self.reserves > 0 {
+                    self.reserves -= 1;
+                    self.exposed += 1;
                 }
-                
-            },
-            _ => {}
+                return;
+            }
+            _ => return
+        };
+        if self.exposed > 0 {
+            self.exposed -= 1;
+            self.stability = self.stability.saturating_sub(stability_cost);
+            self.total_yield += 1;
         }
     }
 }
@@ -87,18 +91,22 @@ pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_
         }
         
         state.update(tool);
-        if let Some(idx) = tool_idx {
+        let uses = tool_idx.map(|idx| {
             let uses = tool_uses.entry(idx).or_insert(0);
             *uses += 1;
+            *uses
+        });
 
-            if *uses >= tool_durability(&tool.unwrap()) {
-                break;
-            }
-        }
-
-        if state.stability <= 0 {
+        // a collapse wins even on the swing that wears the tool out
+        if state.stability == 0 {
             collapsed = true;
             break;
+        }
+
+        if let Some(uses) = uses {
+            if uses >= tool_durability(tool.unwrap()).unwrap() {
+                break;
+            }
         }
     };
 
@@ -108,22 +116,22 @@ pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_
         if tool_uses.contains_key(&i) {
             update_tool_durability(&mut item_stack.item, tool_uses[&i]);
         }
-        if &item_stack.item == yield_ {
+        if !collapsed && &item_stack.item == yield_ {
             item_stack.count += state.total_yield;
             yield_in_inventory = true;
         }
     }
-    if !yield_in_inventory {
+    if !collapsed && !yield_in_inventory {
         let new_item_stack = ItemStack {
             item: yield_.clone(),
             count: state.total_yield,
         };
         expected_inventory.push(new_item_stack);
     }
-    
-    // a pickaxe worn down to nothing breaks
+
+    // a tool worn down to nothing breaks
     expected_inventory.retain(|item_stack| {
-        item_stack.count > 0 && !matches!(item_stack.item, Item::CrudePickaxe { durability: 0 })
+        item_stack.count > 0 && tool_durability(&item_stack.item) != Some(0)
     });
 
     for (i, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {

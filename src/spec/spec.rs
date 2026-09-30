@@ -10,6 +10,7 @@ use crate::spec::flush::{
     views::{node_lines, crafting_menu_lines},
 };
 use serde_json::from_str;
+use std::iter::zip;
 
 pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
     check_increment(old_state, new_state);
@@ -37,8 +38,14 @@ pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
         Some(Action::Craft(recipe_idx)) => check_craft(old_state, new_state, recipe_idx),
         Some(Action::Exit) => check_exit(old_state, new_state),
         None => {
-            assert_eq!(new_state.agents[old_state.agent_idx].error_message, None);
-            //check_agents_idle(old_state, new_state, false);
+            for (i, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
+                if i != old_state.agent_idx {
+                    assert_eq!(new_agent.error_message, old_agent.error_message)
+                }
+                assert_eq!(new_agent.body_grid, old_agent.body_grid);
+                assert_eq!(new_agent.open_menu, old_agent.open_menu);
+                assert_eq!(new_agent.inventory, old_agent.inventory);
+            }
         }
     }
 
