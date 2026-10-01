@@ -1,4 +1,4 @@
-use crate::state::state::{State, Agent, PointOfInterest, DepositType, Recipe};
+use crate::state::state::{State, Agent, PointOfInterest, DepositType, Recipe, CombatEncounter};
 use crate::spec::common::item_label;
 
 /// Where the agent stands, who else is there, and what it can work on.
@@ -23,9 +23,31 @@ pub fn node_lines(state: &State, agent: &Agent) -> Vec<String> {
                 };
                 format!("{} ({}, exposed {}, stability {}, reserves {})", name, type_label, exposed, stability, reserves)
             }
-            PointOfInterest::Inspectable { name, .. } => name.clone()
+            PointOfInterest::Inspectable { name, .. } => name.clone(),
+            PointOfInterest::EnemyGroup { name, enemies } => {
+                let enemy_names = enemies.iter()
+                    .map(|enemy| enemy.name.clone())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                format!("{} (enemies: {})", name, enemy_names)
+            }
         };
         lines.push(format!("[{}] {}", poi_idx, label));
+    }
+    lines.push("".to_string());
+
+    // each fight is listed under the enemy group it is against
+    lines.push("Combat encounters:".to_string());
+    for CombatEncounter::Pve { enemy_group_poi_idx, agent_idxs, .. } in &node.combat_encounters {
+        let group_name = match &node.pois[*enemy_group_poi_idx] {
+            PointOfInterest::EnemyGroup { name, .. } => name,
+            _ => panic!("encounter is not against an enemy group. this shouldn't be reachable")
+        };
+        let fighters = agent_idxs.iter()
+            .map(|agent_idx| state.agents[*agent_idx].name.clone())
+            .collect::<Vec<String>>()
+            .join(", ");
+        lines.push(format!("[{}] {}: {}", enemy_group_poi_idx, group_name, fighters));
     }
     lines.push("".to_string());
 

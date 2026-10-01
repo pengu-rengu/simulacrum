@@ -51,7 +51,23 @@ pub struct Message {
 pub struct Node {
     pub name: String,
     pub biome: String,
-    pub pois: Vec<PointOfInterest>
+    pub pois: Vec<PointOfInterest>,
+    pub combat_encounters: Vec<CombatEncounter>
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct Enemy {
+    pub name: String,
+    pub body_grid: BodyGrid
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum CombatEncounter {
+    Pve {
+        enemy_group_poi_idx: usize,
+        agent_idxs: Vec<usize>,
+        enemies: Vec<Enemy>
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -67,6 +83,10 @@ pub enum PointOfInterest {
     Inspectable {
         name: String,
         menu: Menu
+    },
+    EnemyGroup {
+        name: String,
+        enemies: Vec<Enemy>
     }
 }
 
@@ -101,7 +121,8 @@ pub enum Action {
     Harvest { poi_idx: usize, tool_idxs: Vec<Option<usize>> },
     Inspect { poi_idx: usize },
     Craft(usize),
-    Exit
+    Exit,
+    Engage { poi_idx: usize }
 }
 
 #[derive(Deserialize)]

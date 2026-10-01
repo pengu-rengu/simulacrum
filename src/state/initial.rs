@@ -1,10 +1,27 @@
-use crate::state::state::{Agent, BodyCell, BodyGrid, DepositType, Item, ItemStack, Menu, Node, PointOfInterest, Recipe, State};
+use crate::state::state::{Agent, BodyCell, BodyGrid, DepositType, Enemy, Item, ItemStack, Menu, Node, PointOfInterest, Recipe, State};
 
 fn initial_body_grid() -> BodyGrid {
     BodyGrid {
         width: 1,
         height: 1,
         cells: vec![BodyCell::CoreCell { health: 10 }],
+    }
+}
+
+/// Core cells in a plus shape.
+fn amber_husk() -> Enemy {
+    let core = || BodyCell::CoreCell { health: 5 };
+    Enemy {
+        name: "Amber Husk".to_string(),
+        body_grid: BodyGrid {
+            width: 3,
+            height: 3,
+            cells: vec![
+                BodyCell::EmptyCell, core(), BodyCell::EmptyCell,
+                core(), core(), core(),
+                BodyCell::EmptyCell, core(), BodyCell::EmptyCell
+            ]
+        }
     }
 }
 
@@ -93,7 +110,8 @@ impl State {
                                 ]
                             }]}
                         },
-                    ]
+                    ],
+                    combat_encounters: vec![]
                 },
                 Node {
                     name: "Amberveins".to_string(),
@@ -106,8 +124,13 @@ impl State {
                             stability: 10,
                             reserves: 8,
                             yield_: Item::CopperOre
+                        },
+                        PointOfInterest::EnemyGroup {
+                            name: "Husk Pack".to_string(),
+                            enemies: vec![amber_husk(), amber_husk()]
                         }
-                    ]
+                    ],
+                    combat_encounters: vec![]
                 }
             ]
         }

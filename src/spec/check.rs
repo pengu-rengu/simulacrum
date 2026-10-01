@@ -1,5 +1,5 @@
 use crate::spec::spec::{check_next_state, check_flush_state};
-use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell, Item, ItemStack, PointOfInterest, DepositType, Menu, Recipe};
+use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell, Item, ItemStack, PointOfInterest, DepositType, Menu, Recipe, CombatEncounter, Enemy};
 use crate::impl_::next_state::{flush_state, next_state};
 use crate::spec::common::tool_durability;
 use std::{
@@ -46,6 +46,27 @@ fn mock_states() -> Vec<State> {
             }
         ]
     };
+    let husk = || {
+        let core = || BodyCell::CoreCell { health: 5 };
+        Enemy {
+            name: "Amber Husk".to_string(),
+            body_grid: BodyGrid {
+                width: 3,
+                height: 3,
+                cells: vec![
+                    BodyCell::EmptyCell, core(), BodyCell::EmptyCell,
+                    core(), core(), core(),
+                    BodyCell::EmptyCell, core(), BodyCell::EmptyCell
+                ]
+            }
+        }
+    };
+    // a husk already hit in its center, so joining a fight must keep its enemies rather than re-clone the template
+    let wounded_husk = || {
+        let mut enemy = husk();
+        enemy.body_grid.cells[4] = BodyCell::CoreCell { health: 2 };
+        enemy
+    };
     let deposit = |name: &str, type_: DepositType, exposed: usize, stability: usize, reserves: usize, yield_: Item| {
         PointOfInterest::ResourceDeposit { name: name.to_string(), type_, exposed, stability, reserves, yield_ }
     };
@@ -62,6 +83,9 @@ fn mock_states() -> Vec<State> {
                     for (exposed, stability, reserves) in deposit_kinds {
                     for open_menu in [None, Some(workbench_menu.clone())] {
                     for has_error in [false, true] {
+                    // 0: no fights, 1: the others at node 0 fight group 5, 2: the acting agent fights group 6,
+                    // 3: the acting agent fights group 5 alongside everyone else at node 0
+                    for encounter_kind in 0..4 {
                         let agents = (0..num_agents).map(|a| Agent {
                             name: format!("Agent{a}"),
                             node_idx: (a + shift) % num_nodes,
@@ -136,6 +160,32 @@ fn mock_states() -> Vec<State> {
                                 None
                             }
                         }).collect();
+                        let at_node_0 = (0..num_agents)
+                            .filter(|a| (a + shift) % num_nodes == 0)
+                            .collect::<Vec<usize>>();
+                        let others_at_node_0 = at_node_0.iter()
+                            .copied()
+                            .filter(|a| *a != agent_idx)
+                            .collect::<Vec<usize>>();
+                        let acting_at_node_0 = at_node_0.contains(&agent_idx);
+                        let encounters = match encounter_kind {
+                            1 if !others_at_node_0.is_empty() => vec![CombatEncounter::Pve {
+                                enemy_group_poi_idx: 5,
+                                agent_idxs: others_at_node_0,
+                                enemies: vec![wounded_husk(), husk()]
+                            }],
+                            2 if acting_at_node_0 => vec![CombatEncounter::Pve {
+                                enemy_group_poi_idx: 6,
+                                agent_idxs: vec![agent_idx],
+                                enemies: vec![husk()]
+                            }],
+                            3 if acting_at_node_0 => vec![CombatEncounter::Pve {
+                                enemy_group_poi_idx: 5,
+                                agent_idxs: at_node_0,
+                                enemies: vec![wounded_husk(), husk()]
+                            }],
+                            _ => vec![]
+                        };
                         base_states.push(State {
                             turn: num_agents + shift,
                             agent_idx,
@@ -153,13 +203,23 @@ fn mock_states() -> Vec<State> {
                                         PointOfInterest::Inspectable {
                                             name: "Ruined Workbench".to_string(),
                                             menu: workbench_menu.clone()
+                                        },
+                                        PointOfInterest::EnemyGroup {
+                                            name: "Husk Pack".to_string(),
+                                            enemies: vec![husk(), husk()]
+                                        },
+                                        PointOfInterest::EnemyGroup {
+                                            name: "Lone Husk".to_string(),
+                                            enemies: vec![husk()]
                                         }
                                     ]
                                 } else {
                                     vec![]
-                                }
+                                },
+                                combat_encounters: if n == 0 { encounters.clone() } else { vec![] }
                             }).collect()
                         });
+                    }
                     }
                     }
                     }
@@ -169,10 +229,10 @@ fn mock_states() -> Vec<State> {
         }
     }
 
-    // check() zips states with inputs, so repeat each state 64 times;
-    // mock_input_strs() cycles its 64 inputs, pairing every state with every input
+    // check() zips states with inputs, so repeat each state 71 times;
+    // mock_input_strs() cycles its 71 inputs, pairing every state with every input
     base_states.into_iter()
-        .flat_map(|state| std::iter::repeat_n(state, 64))
+        .flat_map(|state| std::iter::repeat_n(state, 71))
         .collect()
 }
 
@@ -248,6 +308,14 @@ fn mock_input_strs() -> Vec<String> {
         serde_json::json!({ "action": { "craft": 3 } }).to_string(),
         serde_json::json!({ "action": { "craft": 9 } }).to_string(),
         serde_json::json!({ "action": "exit" }).to_string(),
+        // engage: 5 and 6 are enemy groups, 0 a deposit, 4 the workbench
+        serde_json::json!({ "action": { "engage": { "poi_idx": 5 } } }).to_string(),
+        serde_json::json!({ "action": { "engage": { "poi_idx": 6 } } }).to_string(),
+        serde_json::json!({ "action": { "engage": { "poi_idx": 0 } } }).to_string(),
+        serde_json::json!({ "action": { "engage": { "poi_idx": 4 } } }).to_string(),
+        serde_json::json!({ "action": { "engage": { "poi_idx": 99 } } }).to_string(),
+        serde_json::json!({ "action": { "engage": {} } }).to_string(),
+        serde_json::json!({ "action": { "engage": { "poi_idx": 5 } }, "send_message": "charge" }).to_string(),
         // action plus message
         serde_json::json!({ "action": { "move_to": "Node1" }, "send_message": "heading out" }).to_string(),
         serde_json::json!({ "action": { "harvest": { "poi_idx": 0, "tool_idxs": [null] } }, "send_message": "grabbing a stick" }).to_string(),
@@ -299,6 +367,35 @@ fn assumptions(state: &State) {
 
     let node_names = state.nodes.iter().map(|node| &node.name).collect::<HashSet<&String>>();
     assert_eq!(node_names.len(), state.nodes.len());
+
+    // every agent fights in at most one encounter, and only where it stands
+    let mut fighting_agent_idxs = HashSet::<usize>::new();
+    for (node_idx, node) in state.nodes.iter().enumerate() {
+        for poi in &node.pois {
+            if let PointOfInterest::EnemyGroup { enemies, .. } = poi {
+                for enemy in enemies {
+                    assert_eq!(enemy.body_grid.cells.len(), enemy.body_grid.width * enemy.body_grid.height);
+                }
+            }
+        }
+
+        let mut engaged_poi_idxs = HashSet::<usize>::new();
+        for CombatEncounter::Pve { enemy_group_poi_idx, agent_idxs, enemies } in &node.combat_encounters {
+            assert!(matches!(node.pois.get(*enemy_group_poi_idx), Some(PointOfInterest::EnemyGroup { .. })));
+            assert!(engaged_poi_idxs.insert(*enemy_group_poi_idx));
+
+            assert!(!agent_idxs.is_empty());
+            for agent_idx in agent_idxs {
+                assert!(*agent_idx < state.agents.len());
+                assert_eq!(state.agents[*agent_idx].node_idx, node_idx);
+                assert!(fighting_agent_idxs.insert(*agent_idx));
+            }
+
+            for enemy in enemies {
+                assert_eq!(enemy.body_grid.cells.len(), enemy.body_grid.width * enemy.body_grid.height);
+            }
+        }
+    }
 }
 
 pub fn check() {

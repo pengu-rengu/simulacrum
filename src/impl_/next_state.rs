@@ -1,4 +1,4 @@
-use crate::state::state::{State, Input, Action, Message, Item, ItemStack, PointOfInterest, DepositType, Menu};
+use crate::state::state::{State, Input, Action, Message, Item, ItemStack, PointOfInterest, DepositType, Menu, CombatEncounter};
 use serde_json::from_str;
 
 pub fn flush_state(state: &State) -> (State, String) {
@@ -54,9 +54,31 @@ pub fn flush_state(state: &State) -> (State, String) {
                         };
                         format!("{} ({}, exposed {}, stability {}, reserves {})", name, type_label, exposed, stability, reserves)
                     }
-                    PointOfInterest::Inspectable { name, .. } => name.clone()
+                    PointOfInterest::Inspectable { name, .. } => name.clone(),
+                    PointOfInterest::EnemyGroup { name, enemies } => {
+                        let enemy_names = enemies.iter()
+                            .map(|enemy| enemy.name.clone())
+                            .collect::<Vec<String>>()
+                            .join(", ");
+                        format!("{} (enemies: {})", name, enemy_names)
+                    }
                 };
                 lines.push(format!("[{}] {}", poi_idx, label));
+            }
+            lines.push("".to_string());
+
+            // each fight is listed under the enemy group it is against
+            lines.push("Combat encounters:".to_string());
+            for CombatEncounter::Pve { enemy_group_poi_idx, agent_idxs, .. } in &node.combat_encounters {
+                let group_name = match &node.pois[*enemy_group_poi_idx] {
+                    PointOfInterest::EnemyGroup { name, .. } => name.clone(),
+                    _ => String::new()
+                };
+                let fighters = agent_idxs.iter()
+                    .map(|agent_idx| state.agents[*agent_idx].name.clone())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                lines.push(format!("[{}] {}: {}", enemy_group_poi_idx, group_name, fighters));
             }
             lines.push("".to_string());
         }
@@ -96,7 +118,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
         Ok(input) => {
             // each action either succeeds or fails with nothing about the agent changed
             let result: Result<(), String> = match input.action {
-                Some(Action::MoveTo(_)) | Some(Action::Harvest { .. }) | Some(Action::Inspect { .. })
+                Some(Action::MoveTo(_)) | Some(Action::Harvest { .. }) | Some(Action::Inspect { .. }) | Some(Action::Engage { .. })
                     if curr_agent.open_menu.is_some() =>
                 {
                     Err("you cannot do that while a menu is open".to_string())
@@ -241,6 +263,36 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                     } else {
                         Err("nothing to exit".to_string())
                     }
+                }
+                Some(Action::Engage { poi_idx }) => 'engage: {
+                    let Some(poi) = state.nodes[curr_node_idx].pois.get(poi_idx) else {
+                        break 'engage Err(format!("no poi at index {poi_idx}"));
+                    };
+                    let PointOfInterest::EnemyGroup { enemies, .. } = poi else {
+                        break 'engage Err("nothing to engage here".to_string());
+                    };
+
+                    // an agent fights in at most one encounter, wherever it is
+                    let in_combat = state.nodes.iter()
+                        .flat_map(|node| &node.combat_encounters)
+                        .any(|CombatEncounter::Pve { agent_idxs, .. }| agent_idxs.contains(&curr_agent_idx));
+                    if in_combat {
+                        break 'engage Err("you are already in combat".to_string());
+                    }
+
+                    // join the fight already running against this group, or start one against fresh clones
+                    let encounters = &mut new_state.nodes[curr_node_idx].combat_encounters;
+                    let existing = encounters.iter_mut()
+                        .find(|CombatEncounter::Pve { enemy_group_poi_idx, .. }| *enemy_group_poi_idx == poi_idx);
+                    match existing {
+                        Some(CombatEncounter::Pve { agent_idxs, .. }) => agent_idxs.push(curr_agent_idx),
+                        None => encounters.push(CombatEncounter::Pve {
+                            enemy_group_poi_idx: poi_idx,
+                            agent_idxs: vec![curr_agent_idx],
+                            enemies: enemies.clone()
+                        })
+                    }
+                    Ok(())
                 }
                 None => Ok(())
             };

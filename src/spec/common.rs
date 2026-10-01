@@ -59,3 +59,9 @@ pub fn check_nodes_unchanged(old_state: &State, new_state: &State) {
         assert_eq!(old_node.pois, new_node.pois);
     }
 }
+
+pub fn check_encounters_unchanged(old_state: &State, new_state: &State) {
+    for (old_node, new_node) in zip(&old_state.nodes, &new_state.nodes) {
+        assert_eq!(old_node.combat_encounters, new_node.combat_encounters);
+    }
+}
