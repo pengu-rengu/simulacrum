@@ -1,6 +1,7 @@
 use crate::spec::spec::{assumptions, check_next_state, check_flush_state};
-use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell, Item, ItemStack, PointOfInterest, DepositType, Menu, Recipe, CombatEncounter, Enemy, ToolAttribute};
+use crate::state::state::{State, Node, BodyGrid, BodyCell, Item, ItemStack, PointOfInterest, DepositType, Menu, Recipe, CombatEncounter, Enemy, ToolAttribute};
 use crate::impl_::next_state::{flush_state, next_state};
+use crate::state::agent::{Agent, NodeworldAgent};
 use std::iter::zip;
 
 fn mock_states() -> Vec<State> {
@@ -86,77 +87,79 @@ fn mock_states() -> Vec<State> {
                     for encounter_kind in 0..4 {
                         let agents = (0..num_agents).map(|a| Agent {
                             name: format!("Agent{a}"),
-                            node_idx: (a + shift) % num_nodes,
-                            node_messages_inbox: (0..a % 3).map(|m| crate::state::state::Message {
-                                sender_agent_idx: (a + m) % num_agents,
-                                content: contents[(a + m) % contents.len()].to_string()
-                            }).collect(),
-                            error_message: if has_error && a == agent_idx {
-                                Some("could not parse input json".to_string())
-                            } else {
-                                None
-                            },
-                            body_grid: {
-                                let width = 1 + a % 3;
-                                let height = 1 + (a + shift) % 2;
-                                BodyGrid {
-                                    width,
-                                    height,
-                                    cells: (0..width * height).map(|cell_idx| match (a + cell_idx) % 3 {
-                                        0 => BodyCell::CoreCell { health: 5 + a },
-                                        1 => BodyCell::CoreCell { health: 0 },
-                                        _ => BodyCell::EmptyCell
-                                    }).collect()
+                            nodeworld: NodeworldAgent {
+                                node_idx: (a + shift) % num_nodes,
+                                node_messages_inbox: (0..a % 3).map(|m| crate::state::state::Message {
+                                    sender_agent_idx: (a + m) % num_agents,
+                                    content: contents[(a + m) % contents.len()].to_string()
+                                }).collect(),
+                                error_message: if has_error && a == agent_idx {
+                                    Some("could not parse input json".to_string())
+                                } else {
+                                    None
+                                },
+                                body_grid: {
+                                    let width = 1 + a % 3;
+                                    let height = 1 + (a + shift) % 2;
+                                    BodyGrid {
+                                        width,
+                                        height,
+                                        cells: (0..width * height).map(|cell_idx| match (a + cell_idx) % 3 {
+                                            0 => BodyCell::CoreCell { health: 5 + a },
+                                            1 => BodyCell::CoreCell { health: 0 },
+                                            _ => BodyCell::EmptyCell
+                                        }).collect()
+                                    }
+                                },
+                                inventory: match inventory_kind {
+                                    0 => vec![],
+                                    1 => vec![
+                                        ItemStack { item: material("Stick"), count: 10 + a },
+                                        ItemStack { item: material("Smooth Pebble"), count: 10 }
+                                    ],
+                                    // two pickaxes: picking the right tool_idx is the point of indexing
+                                    2 => vec![
+                                        ItemStack { item: crude_pickaxe(1), count: 1 },
+                                        ItemStack { item: material("Resin"), count: 3 },
+                                        ItemStack { item: crude_pickaxe(20), count: 1 }
+                                    ],
+                                    3 => vec![
+                                        ItemStack { item: material("Stick"), count: 10 },
+                                        ItemStack { item: material("Smooth Pebble"), count: 9 }
+                                    ],
+                                    4 => vec![
+                                        ItemStack { item: material("Stick"), count: 10 },
+                                        ItemStack { item: material("Smooth Pebble"), count: 10 },
+                                        ItemStack { item: material("Resin"), count: 3 },
+                                        ItemStack { item: crude_pickaxe(20), count: 1 },
+                                        ItemStack { item: crude_pickaxe(20), count: 1 }
+                                    ],
+                                    // same layout as 2 at indices 0-2, with a fresh and a worn drill after
+                                    5 => vec![
+                                        ItemStack { item: copper_pickaxe(1), count: 1 },
+                                        ItemStack { item: material("Resin"), count: 3 },
+                                        ItemStack { item: copper_pickaxe(40), count: 1 },
+                                        ItemStack { item: copper_drill(20), count: 1 },
+                                        ItemStack { item: copper_drill(1), count: 1 }
+                                    ],
+                                    6 => vec![
+                                        ItemStack { item: material("Stick"), count: 10 },
+                                        ItemStack { item: material("Copper Ore"), count: 13 },
+                                        ItemStack { item: material("Resin"), count: 3 }
+                                    ],
+                                    _ => vec![
+                                        ItemStack { item: crude_pickaxe(20), count: 1 },
+                                        ItemStack { item: rock_auger.clone(), count: 1 },
+                                        ItemStack { item: copper_drill(20), count: 1 },
+                                        ItemStack { item: flint_knife.clone(), count: 1 }
+                                    ]
+                                },
+                                // only the acting agent opens a menu, and only where a workbench stands
+                                open_menu: if a == agent_idx && (a + shift) % num_nodes == 0 {
+                                    open_menu.clone()
+                                } else {
+                                    None
                                 }
-                            },
-                            inventory: match inventory_kind {
-                                0 => vec![],
-                                1 => vec![
-                                    ItemStack { item: material("Stick"), count: 10 + a },
-                                    ItemStack { item: material("Smooth Pebble"), count: 10 }
-                                ],
-                                // two pickaxes: picking the right tool_idx is the point of indexing
-                                2 => vec![
-                                    ItemStack { item: crude_pickaxe(1), count: 1 },
-                                    ItemStack { item: material("Resin"), count: 3 },
-                                    ItemStack { item: crude_pickaxe(20), count: 1 }
-                                ],
-                                3 => vec![
-                                    ItemStack { item: material("Stick"), count: 10 },
-                                    ItemStack { item: material("Smooth Pebble"), count: 9 }
-                                ],
-                                4 => vec![
-                                    ItemStack { item: material("Stick"), count: 10 },
-                                    ItemStack { item: material("Smooth Pebble"), count: 10 },
-                                    ItemStack { item: material("Resin"), count: 3 },
-                                    ItemStack { item: crude_pickaxe(20), count: 1 },
-                                    ItemStack { item: crude_pickaxe(20), count: 1 }
-                                ],
-                                // same layout as 2 at indices 0-2, with a fresh and a worn drill after
-                                5 => vec![
-                                    ItemStack { item: copper_pickaxe(1), count: 1 },
-                                    ItemStack { item: material("Resin"), count: 3 },
-                                    ItemStack { item: copper_pickaxe(40), count: 1 },
-                                    ItemStack { item: copper_drill(20), count: 1 },
-                                    ItemStack { item: copper_drill(1), count: 1 }
-                                ],
-                                6 => vec![
-                                    ItemStack { item: material("Stick"), count: 10 },
-                                    ItemStack { item: material("Copper Ore"), count: 13 },
-                                    ItemStack { item: material("Resin"), count: 3 }
-                                ],
-                                _ => vec![
-                                    ItemStack { item: crude_pickaxe(20), count: 1 },
-                                    ItemStack { item: rock_auger.clone(), count: 1 },
-                                    ItemStack { item: copper_drill(20), count: 1 },
-                                    ItemStack { item: flint_knife.clone(), count: 1 }
-                                ]
-                            },
-                            // only the acting agent opens a menu, and only where a workbench stands
-                            open_menu: if a == agent_idx && (a + shift) % num_nodes == 0 {
-                                open_menu.clone()
-                            } else {
-                                None
                             }
                         }).collect();
                         let at_node_0 = (0..num_agents)

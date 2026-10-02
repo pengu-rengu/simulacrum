@@ -1,13 +1,14 @@
-use crate::state::state::{State, Agent, PointOfInterest, Recipe, CombatEncounter};
+use crate::state::state::{State, PointOfInterest, Recipe, CombatEncounter};
 use crate::spec::common::{deposit_type_label, item_label};
+use crate::state::agent::Agent;
 
 pub fn node_lines(state: &State, agent: &Agent) -> Vec<String> {
-    let node = &state.nodes[agent.node_idx];
+    let node = &state.nodes[agent.nodeworld.node_idx];
     let mut lines = vec![format!("Node: {} ({})", node.name, node.biome), "".to_string()];
 
     lines.push("Agents:".to_string());
     for other_agent in &state.agents {
-        if other_agent.node_idx != agent.node_idx { continue; }
+        if other_agent.nodeworld.node_idx != agent.nodeworld.node_idx { continue; }
         lines.push(other_agent.name.clone());
     }
     lines.push("".to_string());

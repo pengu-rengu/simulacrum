@@ -1,4 +1,5 @@
-use crate::state::state::{Agent, ToolAttribute, BodyCell, BodyGrid, DepositType, Enemy, Item, ItemStack, Menu, Node, PointOfInterest, Recipe, State};
+use crate::state::state::{ToolAttribute, BodyCell, BodyGrid, DepositType, Enemy, Item, ItemStack, Menu, Node, PointOfInterest, Recipe, State};
+use crate::state::agent::{Agent, NodeworldAgent};
 
 fn initial_body_grid() -> BodyGrid {
     BodyGrid {
@@ -33,21 +34,25 @@ impl State {
             agents: vec![
                 Agent {
                     name: "Agent1".to_string(),
-                    node_idx: 0,
-                    node_messages_inbox: vec![],
-                    error_message: None,
-                    body_grid: initial_body_grid(),
-                    inventory: vec![],
-                    open_menu: None,
+                    nodeworld: NodeworldAgent {
+                        node_idx: 0,
+                        node_messages_inbox: vec![],
+                        error_message: None,
+                        body_grid: initial_body_grid(),
+                        inventory: vec![],
+                        open_menu: None
+                    }
                 },
                 Agent {
                     name: "Agent2".to_string(),
-                    node_idx: 0,
-                    node_messages_inbox: vec![],
-                    error_message: None,
-                    body_grid: initial_body_grid(),
-                    inventory: vec![],
-                    open_menu: None
+                    nodeworld: NodeworldAgent {
+                        node_idx: 0,
+                        node_messages_inbox: vec![],
+                        error_message: None,
+                        body_grid: initial_body_grid(),
+                        inventory: vec![],
+                        open_menu: None
+                    }
                 },
             ],
             nodes: vec![

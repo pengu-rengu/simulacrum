@@ -53,7 +53,7 @@ pub fn inventory_with(inventory: &Vec<ItemStack>, item: &Item, count: usize) -> 
 /// Why the acting agent cannot move, harvest, inspect or engage right now, if it cannot.
 pub fn action_blocked(state: &State) -> Option<&'static str> {
     let acting_agent_idx = state.agent_idx;
-    if state.agents[acting_agent_idx].open_menu.is_some() {
+    if state.agents[acting_agent_idx].nodeworld.open_menu.is_some() {
         return Some("you cannot do that while a menu is open");
     }
 
@@ -71,15 +71,15 @@ pub fn check_error_and_unchanged(old_state: &State, new_state: &State, expected:
     let acting_agent_idx = old_state.agent_idx;
     let old_agent = &old_state.agents[acting_agent_idx];
     let new_agent = &new_state.agents[acting_agent_idx];
-    assert_eq!(new_agent.error_message, Some(expected.to_string()));
-    assert_eq!(new_agent.open_menu, old_agent.open_menu);
-    assert_eq!(new_agent.node_idx, old_agent.node_idx);
-    assert_eq!(new_agent.inventory, old_agent.inventory);
+    assert_eq!(new_agent.nodeworld.error_message, Some(expected.to_string()));
+    assert_eq!(new_agent.nodeworld.open_menu, old_agent.nodeworld.open_menu);
+    assert_eq!(new_agent.nodeworld.node_idx, old_agent.nodeworld.node_idx);
+    assert_eq!(new_agent.nodeworld.inventory, old_agent.nodeworld.inventory);
 }
 
 pub fn check_body_grids_unchanged(old_state: &State, new_state: &State) {
     for (old_agent, new_agent) in zip(&old_state.agents, &new_state.agents) {
-        assert_eq!(old_agent.body_grid, new_agent.body_grid);
+        assert_eq!(old_agent.nodeworld.body_grid, new_agent.nodeworld.body_grid);
     }
 }
 

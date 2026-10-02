@@ -27,7 +27,7 @@ pub fn flush_state(state: &State) -> (State, String) {
 
     let mut lines = vec![];
 
-    match &agent.open_menu {
+    match &agent.nodeworld.open_menu {
         // an open menu replaces the node view, but the agent still holds items and still hears the room
         Some(Menu::CraftingMenu { recipes }) => {
             lines.push("Crafting menu: craft or exit".to_string());
@@ -44,13 +44,13 @@ pub fn flush_state(state: &State) -> (State, String) {
             lines.push("".to_string());
         }
         None => {
-            let node = &state.nodes[agent.node_idx];
+            let node = &state.nodes[agent.nodeworld.node_idx];
             lines.push(format!("Node: {} ({})", node.name, node.biome));
             lines.push("".to_string());
 
             lines.push("Agents:".to_string());
             for other_agent in &state.agents {
-                if other_agent.node_idx != agent.node_idx { continue; }
+                if other_agent.nodeworld.node_idx != agent.nodeworld.node_idx { continue; }
                 lines.push(other_agent.name.clone());
             }
             lines.push("".to_string());
@@ -96,23 +96,23 @@ pub fn flush_state(state: &State) -> (State, String) {
     }
 
     lines.push("Inventory:".to_string());
-    for item_stack in &agent.inventory {
+    for item_stack in &agent.nodeworld.inventory {
         lines.push(format!("{} {}", item_stack.count, item_label(&item_stack.item)));
     }
     lines.push("".to_string());
 
     lines.push("Messages:".to_string());
-    for message in &agent.node_messages_inbox {
+    for message in &agent.nodeworld.node_messages_inbox {
         lines.push(format!("[{}] {}", state.agents[message.sender_agent_idx].name, message.content));
     }
 
-    if let Some(error_message) = &agent.error_message {
+    if let Some(error_message) = &agent.nodeworld.error_message {
         lines.push("".to_string());
         lines.push(format!("Error: {}", error_message));
     }
 
     let output = lines.join("\n");
-    new_state.agents[agent_idx].node_messages_inbox.clear();
+    new_state.agents[agent_idx].nodeworld.node_messages_inbox.clear();
     (new_state, output)
 }
 
@@ -120,11 +120,11 @@ pub fn next_state(state: &State, input_str: &str) -> State {
     let mut new_state = state.clone();
     let curr_agent_idx = state.agent_idx;
     let curr_agent = &state.agents[curr_agent_idx];
-    let curr_node_idx = curr_agent.node_idx;
+    let curr_node_idx = curr_agent.nodeworld.node_idx;
 
     match from_str::<Input>(input_str) {
         Err(_) => {
-            new_state.agents[curr_agent_idx].error_message = Some("could not parse input json".to_string());
+            new_state.agents[curr_agent_idx].nodeworld.error_message = Some("could not parse input json".to_string());
         }
         Ok(input) => {
             // each action either succeeds or fails with nothing about the agent changed
@@ -135,7 +135,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
 
             let result: Result<(), String> = match input.action {
                 Some(Action::MoveTo(_)) | Some(Action::Harvest { .. }) | Some(Action::Inspect { .. }) | Some(Action::Engage { .. })
-                    if curr_agent.open_menu.is_some() =>
+                    if curr_agent.nodeworld.open_menu.is_some() =>
                 {
                     Err("you cannot do that while a menu is open".to_string())
                 }
@@ -147,7 +147,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                 Some(Action::MoveTo(node_name)) => {
                     match state.nodes.iter().position(|node| node.name == node_name) {
                         Some(target_node_idx) => {
-                            new_state.agents[curr_agent_idx].node_idx = target_node_idx;
+                            new_state.agents[curr_agent_idx].nodeworld.node_idx = target_node_idx;
                             Ok(())
                         }
                         None => Err(format!("no node named {node_name}"))
@@ -164,13 +164,13 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                     // swings are simulated on a copy; the deposit itself never changes
                     let (mut exposed, mut stability, mut reserves) = (*exposed, *stability, *reserves);
                     let mut total_yield = 0;
-                    let mut tool_uses = vec![0; curr_agent.inventory.len()];
+                    let mut tool_uses = vec![0; curr_agent.nodeworld.inventory.len()];
                     let mut collapsed = false;
 
                     for tool_idx in tool_idxs {
                         let tool = match tool_idx {
                             None => None,
-                            Some(idx) => match curr_agent.inventory.get(idx) {
+                            Some(idx) => match curr_agent.nodeworld.inventory.get(idx) {
                                 Some(item_stack) => Some(&item_stack.item),
                                 None => break 'harvest Err(format!("no item at inventory index {idx}"))
                             }
@@ -220,7 +220,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                         }
                     }
 
-                    let inventory = &mut new_state.agents[curr_agent_idx].inventory;
+                    let inventory = &mut new_state.agents[curr_agent_idx].nodeworld.inventory;
                     for (item_stack, uses) in inventory.iter_mut().zip(&tool_uses) {
                         if let Item::Tool { durability, .. } = &mut item_stack.item {
                             *durability -= uses;
@@ -244,21 +244,21 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                     match state.nodes[curr_node_idx].pois.get(poi_idx) {
                         None => Err(format!("no poi at index {poi_idx}")),
                         Some(PointOfInterest::Inspectable { menu, .. }) => {
-                            new_state.agents[curr_agent_idx].open_menu = Some(menu.clone());
+                            new_state.agents[curr_agent_idx].nodeworld.open_menu = Some(menu.clone());
                             Ok(())
                         }
                         Some(_) => Err("nothing to inspect here".to_string())
                     }
                 }
                 Some(Action::Craft(recipe_idx)) => 'craft: {
-                    let Some(Menu::CraftingMenu { recipes }) = &curr_agent.open_menu else {
+                    let Some(Menu::CraftingMenu { recipes }) = &curr_agent.nodeworld.open_menu else {
                         break 'craft Err("crafting menu not open".to_string());
                     };
                     let Some(recipe) = recipes.get(recipe_idx) else {
                         break 'craft Err(format!("no recipe at index {recipe_idx}"));
                     };
 
-                    let mut inventory = curr_agent.inventory.clone();
+                    let mut inventory = curr_agent.nodeworld.inventory.clone();
                     // ingredients are materials, matched by name
                     for (ingredient_name, ingredient_count) in &recipe.ingredients {
                         let ingredient_stack = inventory.iter_mut().find(|item_stack| {
@@ -282,12 +282,12 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                     }
                     inventory.retain(|item_stack| item_stack.count > 0);
 
-                    new_state.agents[curr_agent_idx].inventory = inventory;
+                    new_state.agents[curr_agent_idx].nodeworld.inventory = inventory;
                     Ok(())
                 }
                 Some(Action::Exit) => {
-                    if curr_agent.open_menu.is_some() {
-                        new_state.agents[curr_agent_idx].open_menu = None;
+                    if curr_agent.nodeworld.open_menu.is_some() {
+                        new_state.agents[curr_agent_idx].nodeworld.open_menu = None;
                         Ok(())
                     } else {
                         Err("nothing to exit".to_string())
@@ -317,13 +317,13 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                 }
                 None => Ok(())
             };
-            new_state.agents[curr_agent_idx].error_message = result.err();
+            new_state.agents[curr_agent_idx].nodeworld.error_message = result.err();
 
             if let Some(content) = input.send_message {
                 // the message reaches whoever shared the node at the start of the turn
                 for (agent_idx, agent) in new_state.agents.iter_mut().enumerate() {
-                    if state.agents[agent_idx].node_idx != curr_node_idx { continue; }
-                    agent.node_messages_inbox.push(Message {
+                    if state.agents[agent_idx].nodeworld.node_idx != curr_node_idx { continue; }
+                    agent.nodeworld.node_messages_inbox.push(Message {
                         sender_agent_idx: curr_agent_idx,
                         content: content.clone()
                     });

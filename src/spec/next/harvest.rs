@@ -67,7 +67,7 @@ pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_
     let acting_agent_idx = old_state.agent_idx;
     let acting_agent = &old_state.agents[acting_agent_idx];
 
-    let Some(poi) = old_state.nodes[acting_agent.node_idx].pois.get(poi_idx) else {
+    let Some(poi) = old_state.nodes[acting_agent.nodeworld.node_idx].pois.get(poi_idx) else {
         check_error_and_unchanged(old_state, new_state, &format!("no poi at index {poi_idx}"));
         return;
     };
@@ -88,7 +88,7 @@ pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_
 
     for tool_idx in tool_idxs {
         let tool = if let Some(idx) = tool_idx {
-            let Some(item_stack) = acting_agent.inventory.get(idx) else {
+            let Some(item_stack) = acting_agent.nodeworld.inventory.get(idx) else {
                 check_error_and_unchanged(old_state, new_state, &format!("no item at inventory index {idx}"));
                 return;
             };
@@ -120,7 +120,7 @@ pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_
     };
 
     let mut yield_in_inventory = false;
-    let mut expected_inventory = acting_agent.inventory.clone();
+    let mut expected_inventory = acting_agent.nodeworld.inventory.clone();
     for (i, item_stack) in expected_inventory.iter_mut().enumerate() {
         if tool_uses.contains_key(&i) {
             update_tool_durability(&mut item_stack.item, tool_uses[&i]);
@@ -145,18 +145,18 @@ pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_
 
     for (i, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
         if i == acting_agent_idx {
-            assert_eq!(new_agent.inventory, expected_inventory);
+            assert_eq!(new_agent.nodeworld.inventory, expected_inventory);
             if collapsed {
-                assert_eq!(new_agent.error_message, Some(format!("deposit collapsed")));
+                assert_eq!(new_agent.nodeworld.error_message, Some(format!("deposit collapsed")));
             } else {
-                assert_eq!(new_agent.error_message, None);
+                assert_eq!(new_agent.nodeworld.error_message, None);
             }
         } else {
-            assert_eq!(new_agent.inventory, old_agent.inventory);
-            assert_eq!(new_agent.error_message, old_agent.error_message);
+            assert_eq!(new_agent.nodeworld.inventory, old_agent.nodeworld.inventory);
+            assert_eq!(new_agent.nodeworld.error_message, old_agent.nodeworld.error_message);
         }
-        assert_eq!(new_agent.open_menu, old_agent.open_menu);
-        assert_eq!(new_agent.node_idx, old_agent.node_idx);
+        assert_eq!(new_agent.nodeworld.open_menu, old_agent.nodeworld.open_menu);
+        assert_eq!(new_agent.nodeworld.node_idx, old_agent.nodeworld.node_idx);
     }
 
 }

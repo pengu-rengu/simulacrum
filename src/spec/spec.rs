@@ -65,11 +65,11 @@ pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
         None => {
             for (i, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
                 if i != old_state.agent_idx {
-                    assert_eq!(new_agent.error_message, old_agent.error_message)
+                    assert_eq!(new_agent.nodeworld.error_message, old_agent.nodeworld.error_message)
                 }
-                assert_eq!(new_agent.body_grid, old_agent.body_grid);
-                assert_eq!(new_agent.open_menu, old_agent.open_menu);
-                assert_eq!(new_agent.inventory, old_agent.inventory);
+                assert_eq!(new_agent.nodeworld.body_grid, old_agent.nodeworld.body_grid);
+                assert_eq!(new_agent.nodeworld.open_menu, old_agent.nodeworld.open_menu);
+                assert_eq!(new_agent.nodeworld.inventory, old_agent.nodeworld.inventory);
             }
         }
     }
@@ -85,14 +85,14 @@ pub fn check_flush_state(old_state: &State, new_state: &State, output: &str) {
     let agent = &old_state.agents[agent_idx];
 
     // an open menu replaces the node view; the agent still holds items and still hears the room
-    let mut lines = match &agent.open_menu {
+    let mut lines = match &agent.nodeworld.open_menu {
         Some(Menu::CraftingMenu { recipes }) => crafting_menu_lines(recipes),
         None => node_lines(old_state, agent),
     };
     lines.extend(inventory_lines(agent));
     lines.extend(message_lines(old_state, agent));
-    lines.extend(error_lines(&new_state.agents[agent_idx].error_message));
+    lines.extend(error_lines(&new_state.agents[agent_idx].nodeworld.error_message));
 
     assert_eq!(output, lines.join("\n"));
-    assert!(new_state.agents[agent_idx].node_messages_inbox.is_empty());
+    assert!(new_state.agents[agent_idx].nodeworld.node_messages_inbox.is_empty());
 }

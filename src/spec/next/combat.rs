@@ -3,12 +3,10 @@ use std::iter::zip;
 use crate::state::state::{CombatEncounter, PointOfInterest, State};
 use crate::spec::common::{action_blocked, check_encounters_unchanged, check_error_and_unchanged};
 
-/// Engaging an enemy group joins the fight already running against it,
-/// or starts one against clones of the group's enemy templates.
 pub fn check_engage(old_state: &State, new_state: &State, poi_idx: usize) {
     let acting_agent_idx = old_state.agent_idx;
     let acting_agent = &old_state.agents[acting_agent_idx];
-    let node_idx = acting_agent.node_idx;
+    let node_idx = acting_agent.nodeworld.node_idx;
 
     let fail = |expected: &str| {
         check_error_and_unchanged(old_state, new_state, expected);
@@ -53,12 +51,12 @@ pub fn check_engage(old_state: &State, new_state: &State, poi_idx: usize) {
 
     for (i, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
         if i == acting_agent_idx {
-            assert_eq!(new_agent.error_message, None);
+            assert_eq!(new_agent.nodeworld.error_message, None);
         } else {
-            assert_eq!(new_agent.error_message, old_agent.error_message);
+            assert_eq!(new_agent.nodeworld.error_message, old_agent.nodeworld.error_message);
         }
-        assert_eq!(new_agent.inventory, old_agent.inventory);
-        assert_eq!(new_agent.open_menu, old_agent.open_menu);
-        assert_eq!(new_agent.node_idx, old_agent.node_idx);
+        assert_eq!(new_agent.nodeworld.inventory, old_agent.nodeworld.inventory);
+        assert_eq!(new_agent.nodeworld.open_menu, old_agent.nodeworld.open_menu);
+        assert_eq!(new_agent.nodeworld.node_idx, old_agent.nodeworld.node_idx);
     }
 }

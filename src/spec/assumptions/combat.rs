@@ -20,7 +20,7 @@ pub fn check_combat(state: &State) {
             assert!(!agent_idxs.is_empty());
             for agent_idx in agent_idxs {
                 assert!(*agent_idx < state.agents.len());
-                assert_eq!(state.agents[*agent_idx].node_idx, node_idx);
+                assert_eq!(state.agents[*agent_idx].nodeworld.node_idx, node_idx);
                 assert!(fighting_agent_idxs.insert(*agent_idx));
             }
         }

@@ -1,14 +1,10 @@
 use serde::{Serialize, Deserialize};
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct Agent {
-    pub name: String,
-    pub node_idx: usize,
-    pub node_messages_inbox: Vec<Message>,
-    pub error_message: Option<String>,
-    pub body_grid: BodyGrid,
-    pub inventory: Vec<ItemStack>,
-    pub open_menu: Option<Menu>
+use crate::state::agent::Agent;
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum Universe {
+    Nodeworld, EscapeRoom
 }
 
 
