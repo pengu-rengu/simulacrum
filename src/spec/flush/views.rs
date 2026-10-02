@@ -1,7 +1,6 @@
 use crate::state::state::{State, Agent, PointOfInterest, Recipe, CombatEncounter};
 use crate::spec::common::{deposit_type_label, item_label};
 
-/// Where the agent stands, who else is there, and what it can work on.
 pub fn node_lines(state: &State, agent: &Agent) -> Vec<String> {
     let node = &state.nodes[agent.node_idx];
     let mut lines = vec![format!("Node: {} ({})", node.name, node.biome), "".to_string()];
@@ -39,11 +38,10 @@ pub fn node_lines(state: &State, agent: &Agent) -> Vec<String> {
             PointOfInterest::EnemyGroup { name, .. } => name,
             _ => panic!("encounter is not against an enemy group. this shouldn't be reachable")
         };
-        let fighters = agent_idxs.iter()
+        let agent_names = agent_idxs.iter()
             .map(|agent_idx| state.agents[*agent_idx].name.clone())
-            .collect::<Vec<String>>()
-            .join(", ");
-        lines.push(format!("[{}] {}: {}", enemy_group_poi_idx, group_name, fighters));
+            .collect::<Vec<String>>().join(", ");
+        lines.push(format!("[{enemy_group_poi_idx}] {group_name}: {agent_names}"));
     }
     lines.push("".to_string());
 
@@ -57,9 +55,8 @@ pub fn crafting_menu_lines(recipes: &Vec<Recipe>) -> Vec<String> {
     lines.push("Recipes:".to_string());
     for (recipe_idx, recipe) in recipes.iter().enumerate() {
         let ingredients = recipe.ingredients.iter()
-            .map(|(name, count)| format!("{} {}", count, name))
-            .collect::<Vec<String>>()
-            .join(", ");
+            .map(|(name, count)| format!("{count} {name}"))
+            .collect::<Vec<String>>().join(", ");
         lines.push(format!("[{}] {} <- {}", recipe_idx, item_label(&recipe.output.item), ingredients));
     }
     lines.push("".to_string());

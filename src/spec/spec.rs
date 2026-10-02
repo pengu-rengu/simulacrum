@@ -1,3 +1,5 @@
+use crate::spec::assumptions::{agents::check_agent, inventory::check_inventory, combat::check_combat};
+use std::collections::HashSet;
 use crate::state::state::{State, Input, Action, Menu};
 use crate::spec::common::{check_body_grids_unchanged, check_encounters_unchanged, check_error_and_unchanged, check_nodes_unchanged};
 use crate::spec::next::{
@@ -12,6 +14,25 @@ use crate::spec::flush::{
 };
 use serde_json::from_str;
 use std::iter::zip;
+
+pub fn assumptions(state: &State) {
+    assert!(state.agents.len() > 0);
+    assert!(state.agent_idx < state.agents.len());
+    assert!(state.nodes.len() > 0);
+
+    for agent in &state.agents {
+        check_agent(state, agent);
+        check_inventory(agent);
+    }
+
+    let agent_names  = state.agents.iter().map(|agent| &agent.name).collect::<HashSet<&String>>();
+    assert_eq!(agent_names.len(), state.agents.len());
+
+    let node_names = state.nodes.iter().map(|node| &node.name).collect::<HashSet<&String>>();
+    assert_eq!(node_names.len(), state.nodes.len());
+
+    check_combat(state);
+}
 
 pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
     check_increment(old_state, new_state);

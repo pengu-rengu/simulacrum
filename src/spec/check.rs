@@ -1,11 +1,7 @@
-use crate::spec::spec::{check_next_state, check_flush_state};
+use crate::spec::spec::{assumptions, check_next_state, check_flush_state};
 use crate::state::state::{State, Agent, Node, BodyGrid, BodyCell, Item, ItemStack, PointOfInterest, DepositType, Menu, Recipe, CombatEncounter, Enemy, ToolAttribute};
 use crate::impl_::next_state::{flush_state, next_state};
-use crate::spec::common::tool_durability;
-use std::{
-    iter::zip,
-    collections::HashSet
-};
+use std::iter::zip;
 
 fn mock_states() -> Vec<State> {
     let contents = ["hi", "", "line1\nline2", "with \"quotes\""];
@@ -327,81 +323,6 @@ fn mock_input_strs() -> Vec<String> {
     (0..mock_states().len())
         .map(|i| base_inputs[i % base_inputs.len()].clone())
         .collect()
-}
-
-fn assumptions(state: &State) {
-    assert!(state.agents.len() > 0);
-    assert!(state.agent_idx < state.agents.len());
-    assert!(state.nodes.len() > 0);
-
-    for agent in &state.agents {
-        assert!(agent.node_idx < state.nodes.len());
-        assert_eq!(agent.body_grid.cells.len(), agent.body_grid.width * agent.body_grid.height);
-        for message in &agent.node_messages_inbox {
-            assert!(message.sender_agent_idx < state.agents.len());
-        }
-        
-        // a menu is only open where the thing it belongs to stands
-        if let Some(open_menu) = &agent.open_menu {
-            assert!(state.nodes[agent.node_idx].pois.iter().any(|poi| {
-                matches!(poi, PointOfInterest::Inspectable { menu, .. } if menu == open_menu)
-            }));
-        }
-
-        for item_stack in &agent.inventory {
-            if let Item::Tool { attributes, .. } = &item_stack.item {
-                assert!(attributes.iter().all(|(_, amount)| *amount > 0));
-            }
-            if let Some(durability) = tool_durability(&item_stack.item) {
-                assert!(durability > 0);
-                assert!(item_stack.count == 1);
-            }
-        }
-
-        let items = agent.inventory.iter().map(|item_stack| &item_stack.item).collect::<Vec<&Item>>();
-        // tools stay unstacked; every other item has one stack
-        for item_stack in &agent.inventory {
-            assert!(item_stack.count > 0);
-            if tool_durability(&item_stack.item).is_none() {
-                assert_eq!(items.iter().filter(|item| ***item == item_stack.item).count(), 1);
-            }
-        }
-    }
-    
-    let agent_names  = state.agents.iter().map(|agent| &agent.name).collect::<HashSet<&String>>();
-    assert_eq!(agent_names.len(), state.agents.len());
-
-    let node_names = state.nodes.iter().map(|node| &node.name).collect::<HashSet<&String>>();
-    assert_eq!(node_names.len(), state.nodes.len());
-
-    // every agent fights in at most one encounter, and only where it stands
-    let mut fighting_agent_idxs = HashSet::<usize>::new();
-    for (node_idx, node) in state.nodes.iter().enumerate() {
-        for poi in &node.pois {
-            if let PointOfInterest::EnemyGroup { enemies, .. } = poi {
-                for enemy in enemies {
-                    assert_eq!(enemy.body_grid.cells.len(), enemy.body_grid.width * enemy.body_grid.height);
-                }
-            }
-        }
-
-        let mut engaged_poi_idxs = HashSet::<usize>::new();
-        for CombatEncounter::Pve { enemy_group_poi_idx, agent_idxs, enemies } in &node.combat_encounters {
-            assert!(matches!(node.pois.get(*enemy_group_poi_idx), Some(PointOfInterest::EnemyGroup { .. })));
-            assert!(engaged_poi_idxs.insert(*enemy_group_poi_idx));
-
-            assert!(!agent_idxs.is_empty());
-            for agent_idx in agent_idxs {
-                assert!(*agent_idx < state.agents.len());
-                assert_eq!(state.agents[*agent_idx].node_idx, node_idx);
-                assert!(fighting_agent_idxs.insert(*agent_idx));
-            }
-
-            for enemy in enemies {
-                assert_eq!(enemy.body_grid.cells.len(), enemy.body_grid.width * enemy.body_grid.height);
-            }
-        }
-    }
 }
 
 pub fn check() {
