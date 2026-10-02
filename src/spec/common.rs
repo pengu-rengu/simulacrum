@@ -1,4 +1,4 @@
-use crate::state::state::{State, Item, ItemStack};
+use crate::state::state::{State, Item, ItemStack, CombatEncounter};
 use std::iter::zip;
 
 /// Durability of a tool, or None for items that are not tools.
@@ -33,6 +33,23 @@ pub fn inventory_with(inventory: &Vec<ItemStack>, item: &Item, count: usize) -> 
         new_inventory.push(ItemStack { item: item.clone(), count });
     }
     new_inventory
+}
+
+/// Why the acting agent cannot move, harvest, inspect or engage right now, if it cannot.
+pub fn action_blocked(state: &State) -> Option<&'static str> {
+    let acting_agent_idx = state.agent_idx;
+    if state.agents[acting_agent_idx].open_menu.is_some() {
+        return Some("you cannot do that while a menu is open");
+    }
+
+    let in_combat = state.nodes.iter()
+        .flat_map(|node| &node.combat_encounters)
+        .any(|CombatEncounter::Pve { agent_idxs, .. }| agent_idxs.contains(&acting_agent_idx));
+    if in_combat {
+        return Some("you cannot do that while in combat");
+    }
+
+    None
 }
 
 pub fn check_error_and_unchanged(old_state: &State, new_state: &State, expected: &str) {

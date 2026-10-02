@@ -1,7 +1,7 @@
 use std::iter::zip;
 
 use crate::state::state::{CombatEncounter, PointOfInterest, State};
-use crate::spec::common::{check_encounters_unchanged, check_error_and_unchanged};
+use crate::spec::common::{action_blocked, check_encounters_unchanged, check_error_and_unchanged};
 
 /// Engaging an enemy group joins the fight already running against it,
 /// or starts one against clones of the group's enemy templates.
@@ -15,6 +15,11 @@ pub fn check_engage(old_state: &State, new_state: &State, poi_idx: usize) {
         check_encounters_unchanged(old_state, new_state);
     };
 
+    if let Some(error) = action_blocked(old_state) {
+        fail(error);
+        return;
+    }
+
     let Some(poi) = old_state.nodes[node_idx].pois.get(poi_idx) else {
         fail(&format!("no poi at index {poi_idx}"));
         return;
@@ -24,16 +29,6 @@ pub fn check_engage(old_state: &State, new_state: &State, poi_idx: usize) {
         fail("nothing to engage here");
         return;
     };
-
-    let in_combat = old_state.nodes.iter()
-        .flat_map(|node| &node.combat_encounters)
-        .any(|CombatEncounter::Pve { agent_idxs, .. }| {
-            agent_idxs.contains(&acting_agent_idx)
-        });
-    if in_combat {
-        fail("you are already in combat");
-        return;
-    }
 
     let mut expected_encounters = old_state.nodes[node_idx].combat_encounters.clone();
     let existing_encounter = expected_encounters.iter_mut().find(|encounter| {

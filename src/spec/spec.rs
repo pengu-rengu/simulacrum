@@ -24,24 +24,17 @@ pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
         return;
     };
 
-    // only engaging starts or joins a fight
-    if !matches!(input.action, Some(Action::Engage { .. })) {
-        check_encounters_unchanged(old_state, new_state);
-    }
-
     if let Some(message) = input.send_message {
         check_send_message(old_state, new_state, &message);
     } else {
         check_messages_unchanged(old_state, new_state);
     }
 
+    if !matches!(input.action, Some(Action::Engage { .. })) {
+        check_encounters_unchanged(old_state, new_state);
+    }
+
     match input.action {
-        Some(Action::MoveTo(_)) | Some(Action::Harvest { .. }) | Some(Action::Inspect { .. }) | Some(Action::Engage { .. })
-            if old_state.agents[old_state.agent_idx].open_menu.is_some() =>
-        {
-            check_error_and_unchanged(old_state, new_state, "you cannot do that while a menu is open");
-            check_encounters_unchanged(old_state, new_state);
-        }
         Some(Action::MoveTo(node_name)) => check_move_to(old_state, new_state, &node_name),
         Some(Action::Harvest { poi_idx, tool_idxs }) => check_harvest(old_state, new_state, poi_idx, tool_idxs),
         Some(Action::Inspect { poi_idx }) => check_inspect(old_state, new_state, poi_idx),
@@ -59,8 +52,6 @@ pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
             }
         }
     }
-
-    
 }
 
 pub fn check_flush_state(old_state: &State, new_state: &State, output: &str) {

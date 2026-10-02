@@ -1,10 +1,15 @@
 use std::iter::zip;
 
 use crate::state::state::{Menu, PointOfInterest, State};
-use crate::spec::common::{check_error_and_unchanged, inventory_with};
+use crate::spec::common::{action_blocked, check_error_and_unchanged, inventory_with};
 
 /// Inspecting is how a menu is opened; only the workbench has one.
 pub fn check_inspect(old_state: &State, new_state: &State, poi_idx: usize) {
+    if let Some(error) = action_blocked(old_state) {
+        check_error_and_unchanged(old_state, new_state, error);
+        return;
+    }
+
     let acting_agent_idx = old_state.agent_idx;
     let acting_agent = &old_state.agents[acting_agent_idx];
     let poi = old_state.nodes[acting_agent.node_idx].pois.get(poi_idx);

@@ -117,11 +117,21 @@ pub fn next_state(state: &State, input_str: &str) -> State {
         }
         Ok(input) => {
             // each action either succeeds or fails with nothing about the agent changed
+            // an agent fights in at most one encounter, wherever it is
+            let in_combat = state.nodes.iter()
+                .flat_map(|node| &node.combat_encounters)
+                .any(|CombatEncounter::Pve { agent_idxs, .. }| agent_idxs.contains(&curr_agent_idx));
+
             let result: Result<(), String> = match input.action {
                 Some(Action::MoveTo(_)) | Some(Action::Harvest { .. }) | Some(Action::Inspect { .. }) | Some(Action::Engage { .. })
                     if curr_agent.open_menu.is_some() =>
                 {
                     Err("you cannot do that while a menu is open".to_string())
+                }
+                Some(Action::MoveTo(_)) | Some(Action::Harvest { .. }) | Some(Action::Inspect { .. }) | Some(Action::Engage { .. })
+                    if in_combat =>
+                {
+                    Err("you cannot do that while in combat".to_string())
                 }
                 Some(Action::MoveTo(node_name)) => {
                     match state.nodes.iter().position(|node| node.name == node_name) {
@@ -271,14 +281,6 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                     let PointOfInterest::EnemyGroup { enemies, .. } = poi else {
                         break 'engage Err("nothing to engage here".to_string());
                     };
-
-                    // an agent fights in at most one encounter, wherever it is
-                    let in_combat = state.nodes.iter()
-                        .flat_map(|node| &node.combat_encounters)
-                        .any(|CombatEncounter::Pve { agent_idxs, .. }| agent_idxs.contains(&curr_agent_idx));
-                    if in_combat {
-                        break 'engage Err("you are already in combat".to_string());
-                    }
 
                     // join the fight already running against this group, or start one against fresh clones
                     let encounters = &mut new_state.nodes[curr_node_idx].combat_encounters;

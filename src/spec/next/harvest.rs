@@ -1,5 +1,5 @@
 use crate::state::state::{State, PointOfInterest, Item, ItemStack, DepositType};
-use crate::spec::common::{check_error_and_unchanged, tool_durability};
+use crate::spec::common::{action_blocked, check_error_and_unchanged, tool_durability};
 use std::collections::{HashMap};
 use std::iter::zip;
 
@@ -55,6 +55,11 @@ impl DepositState {
 }
 
 pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_idxs: Vec<Option<usize>>) {
+    if let Some(error) = action_blocked(old_state) {
+        check_error_and_unchanged(old_state, new_state, error);
+        return;
+    }
+
     let acting_agent_idx = old_state.agent_idx;
     let acting_agent = &old_state.agents[acting_agent_idx];
 
