@@ -11,15 +11,16 @@ pub struct Agent {
     pub open_menu: Option<Menu>
 }
 
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum ToolAttribute {
+    Chipping, Drilling
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum Item {
-    Stick,
-    Resin,
-    SmoothPebble,
-    CopperOre,
-    CrudePickaxe { durability: usize },
-    CopperPickaxe { durability: usize },
-    CopperDrill { durability: usize }
+    Material { name: String },
+    Tool { name: String, deposit_type: DepositType, attributes: Vec<(ToolAttribute, usize)>, durability: usize }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -103,7 +104,7 @@ pub enum Menu {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Recipe {
     pub output: ItemStack,
-    pub ingredients: Vec<ItemStack>
+    pub ingredients: Vec<(String, usize)>
 }
 
 #[derive(Serialize, Deserialize, Clone)]

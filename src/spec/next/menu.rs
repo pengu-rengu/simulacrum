@@ -1,6 +1,6 @@
 use std::iter::zip;
 
-use crate::state::state::{Menu, PointOfInterest, State};
+use crate::state::state::{Item, Menu, PointOfInterest, State};
 use crate::spec::common::{action_blocked, check_error_and_unchanged, inventory_with};
 
 /// Inspecting is how a menu is opened; only the workbench has one.
@@ -40,12 +40,15 @@ pub fn check_craft(old_state: &State, new_state: &State, recipe_idx: usize) {
     };
 
     let mut expected_inventory = acting_agent.inventory.clone();
-    for ingredient in &recipe.ingredients {
+    // an ingredient is a material, matched by name
+    for (ingredient_name, ingredient_count) in &recipe.ingredients {
         let mut affordable = true;
-        let item_stack_idx = expected_inventory.iter().position(|item_stack| item_stack.item == ingredient.item);
+        let item_stack_idx = expected_inventory.iter().position(|item_stack| {
+            matches!(&item_stack.item, Item::Material { name } if name == ingredient_name)
+        });
         if let Some(idx) = item_stack_idx {
-            if expected_inventory[idx].count >= ingredient.count {
-                expected_inventory[idx].count -= ingredient.count;
+            if expected_inventory[idx].count >= *ingredient_count {
+                expected_inventory[idx].count -= *ingredient_count;
             } else {
                 affordable = false;
             }

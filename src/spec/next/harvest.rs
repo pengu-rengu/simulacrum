@@ -1,24 +1,23 @@
-use crate::state::state::{State, PointOfInterest, Item, ItemStack, DepositType};
+use crate::state::state::{State, PointOfInterest, Item, ItemStack, DepositType, ToolAttribute};
 use crate::spec::common::{action_blocked, check_error_and_unchanged, tool_durability};
 use std::collections::{HashMap};
 use std::iter::zip;
 
+/// Bare hands work forage; a tool works whatever it was made for; a material works nothing.
 pub fn tool_deposit_type(item: Option<&Item>) -> Option<DepositType> {
     match item {
-        Some(Item::CrudePickaxe { .. } | Item::CopperPickaxe { .. } | Item::CopperDrill { .. }) => Some(DepositType::Rock),
         None => Some(DepositType::Forage),
-        _ => None
+        Some(Item::Tool { deposit_type, .. }) => Some(deposit_type.clone()),
+        Some(Item::Material { .. }) => None
     }
 }
 
 pub fn update_tool_durability(item: &mut Item, uses: usize) {
     match item {
-        Item::CrudePickaxe { durability }
-        | Item::CopperPickaxe { durability }
-        | Item::CopperDrill { durability } => {
+        Item::Tool { durability, .. } => {
             *durability -= uses;
         }
-        _ => {}
+        Item::Material { .. } => {}
     }
 }
 
@@ -30,26 +29,31 @@ struct DepositState {
 }
 
 impl DepositState {
-    /// One swing. Digging takes an exposed unit at a stability cost; drilling exposes a unit from reserves.
-    /// A swing with nothing to act on does nothing, but still wears the tool.
+    /// One swing: the tool's attributes apply in order, bare hands chip 1.
+    /// Chipping moves exposed into yield, drilling moves reserves into exposed,
+    /// and every unit moved costs 1 stability. A swing that moves nothing still wears the tool.
     fn update(&mut self, tool: Option<&Item>) {
-        let stability_cost = match tool {
-            None => 1,
-            Some(Item::CrudePickaxe { .. }) => 5,
-            Some(Item::CopperPickaxe { .. }) => 3,
-            Some(Item::CopperDrill { .. }) => {
-                if self.reserves > 0 {
-                    self.reserves -= 1;
-                    self.exposed += 1;
-                }
-                return;
-            }
-            _ => return
+        let attributes = match tool {
+            None => vec![(ToolAttribute::Chipping, 1)],
+            Some(Item::Tool { attributes, .. }) => attributes.clone(),
+            Some(Item::Material { .. }) => vec![]
         };
-        if self.exposed > 0 {
-            self.exposed -= 1;
-            self.stability = self.stability.saturating_sub(stability_cost);
-            self.total_yield += 1;
+        for (attribute, amount) in attributes {
+            let moved = match attribute {
+                ToolAttribute::Chipping => {
+                    let moved = amount.min(self.exposed);
+                    self.exposed -= moved;
+                    self.total_yield += moved;
+                    moved
+                }
+                ToolAttribute::Drilling => {
+                    let moved = amount.min(self.reserves);
+                    self.reserves -= moved;
+                    self.exposed += moved;
+                    moved
+                }
+            };
+            self.stability = self.stability.saturating_sub(moved);
         }
     }
 }

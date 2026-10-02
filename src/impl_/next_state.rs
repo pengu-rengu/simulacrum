@@ -1,4 +1,4 @@
-use crate::state::state::{State, Input, Action, Message, Item, ItemStack, PointOfInterest, DepositType, Menu, CombatEncounter};
+use crate::state::state::{State, Input, Action, Message, Item, ItemStack, PointOfInterest, DepositType, Menu, CombatEncounter, ToolAttribute};
 use serde_json::from_str;
 
 pub fn flush_state(state: &State) -> (State, String) {
@@ -8,10 +8,21 @@ pub fn flush_state(state: &State) -> (State, String) {
 
     // the spec cannot be imported from here, so only the label formatting is restated
     let item_label = |item: &Item| match item {
-        Item::CrudePickaxe { durability } => format!("CrudePickaxe (durability {durability})"),
-        Item::CopperPickaxe { durability } => format!("CopperPickaxe (durability {durability})"),
-        Item::CopperDrill { durability } => format!("CopperDrill (durability {durability})"),
-        _ => format!("{:?}", item)
+        Item::Material { name } => name.clone(),
+        Item::Tool { name, deposit_type, attributes, durability } => {
+            let mut parts = vec![match deposit_type {
+                DepositType::Rock => "rock".to_string(),
+                DepositType::Forage => "forage".to_string()
+            }];
+            for (attribute, amount) in attributes {
+                match attribute {
+                    ToolAttribute::Chipping => parts.push(format!("chipping {amount}")),
+                    ToolAttribute::Drilling => parts.push(format!("drilling {amount}"))
+                }
+            }
+            parts.push(format!("durability {durability}"));
+            format!("{} ({})", name, parts.join(", "))
+        }
     };
 
     let mut lines = vec![];
@@ -25,7 +36,7 @@ pub fn flush_state(state: &State) -> (State, String) {
             lines.push("Recipes:".to_string());
             for (recipe_idx, recipe) in recipes.iter().enumerate() {
                 let ingredients = recipe.ingredients.iter()
-                    .map(|ingredient| format!("{} {}", ingredient.count, item_label(&ingredient.item)))
+                    .map(|(name, count)| format!("{} {}", count, name))
                     .collect::<Vec<String>>()
                     .join(", ");
                 lines.push(format!("[{}] {} <- {}", recipe_idx, item_label(&recipe.output.item), ingredients));
@@ -164,24 +175,34 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                                 None => break 'harvest Err(format!("no item at inventory index {idx}"))
                             }
                         };
-                        // digging tools take an exposed unit at a stability cost; the drill exposes one from reserves
-                        let (stability_cost, durability) = match (type_, tool) {
-                            (DepositType::Forage, None) => (1, None),
-                            (DepositType::Rock, Some(Item::CrudePickaxe { durability })) => (5, Some(*durability)),
-                            (DepositType::Rock, Some(Item::CopperPickaxe { durability })) => (3, Some(*durability)),
-                            (DepositType::Rock, Some(Item::CopperDrill { durability })) => (0, Some(*durability)),
+                        // bare hands chip forage; a tool only works the deposit type it was made for
+                        let bare_hands = [(ToolAttribute::Chipping, 1)];
+                        let (attributes, durability) = match tool {
+                            None if *type_ == DepositType::Forage => (&bare_hands[..], None),
+                            Some(Item::Tool { deposit_type, attributes, durability, .. }) if deposit_type == type_ => {
+                                (&attributes[..], Some(*durability))
+                            }
                             _ => break 'harvest Err("this tool has no use here".to_string())
                         };
 
-                        if matches!(tool, Some(Item::CopperDrill { .. })) {
-                            if reserves > 0 {
-                                reserves -= 1;
-                                exposed += 1;
-                            }
-                        } else if exposed > 0 {
-                            exposed -= 1;
-                            stability = stability.saturating_sub(stability_cost);
-                            total_yield += 1;
+                        // chipping moves exposed into yield, drilling moves reserves into exposed;
+                        // every unit moved costs a point of stability
+                        for (attribute, amount) in attributes {
+                            let moved = match attribute {
+                                ToolAttribute::Chipping => {
+                                    let moved = (*amount).min(exposed);
+                                    exposed -= moved;
+                                    total_yield += moved;
+                                    moved
+                                }
+                                ToolAttribute::Drilling => {
+                                    let moved = (*amount).min(reserves);
+                                    reserves -= moved;
+                                    exposed += moved;
+                                    moved
+                                }
+                            };
+                            stability = stability.saturating_sub(moved);
                         }
                         if let Some(idx) = tool_idx {
                             tool_uses[idx] += 1;
@@ -201,10 +222,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
 
                     let inventory = &mut new_state.agents[curr_agent_idx].inventory;
                     for (item_stack, uses) in inventory.iter_mut().zip(&tool_uses) {
-                        if let Item::CrudePickaxe { durability }
-                            | Item::CopperPickaxe { durability }
-                            | Item::CopperDrill { durability } = &mut item_stack.item
-                        {
+                        if let Item::Tool { durability, .. } = &mut item_stack.item {
                             *durability -= uses;
                         }
                     }
@@ -217,10 +235,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                     }
                     // a tool worn down to nothing breaks
                     inventory.retain(|item_stack| {
-                        item_stack.count > 0 && !matches!(
-                            item_stack.item,
-                            Item::CrudePickaxe { durability: 0 } | Item::CopperPickaxe { durability: 0 } | Item::CopperDrill { durability: 0 }
-                        )
+                        item_stack.count > 0 && !matches!(item_stack.item, Item::Tool { durability: 0, .. })
                     });
 
                     if collapsed { Err("deposit collapsed".to_string()) } else { Ok(()) }
@@ -244,18 +259,22 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                     };
 
                     let mut inventory = curr_agent.inventory.clone();
-                    for ingredient in &recipe.ingredients {
-                        match inventory.iter_mut().find(|item_stack| item_stack.item == ingredient.item) {
-                            Some(item_stack) if item_stack.count >= ingredient.count => {
-                                item_stack.count -= ingredient.count;
+                    // ingredients are materials, matched by name
+                    for (ingredient_name, ingredient_count) in &recipe.ingredients {
+                        let ingredient_stack = inventory.iter_mut().find(|item_stack| {
+                            matches!(&item_stack.item, Item::Material { name } if name == ingredient_name)
+                        });
+                        match ingredient_stack {
+                            Some(item_stack) if item_stack.count >= *ingredient_count => {
+                                item_stack.count -= *ingredient_count;
                             }
                             _ => break 'craft Err("not enough items to craft recipe".to_string())
                         }
                     }
                     // tools stay unstacked; every other item joins its existing stack
                     let existing_stack = match recipe.output.item {
-                        Item::CrudePickaxe { .. } | Item::CopperPickaxe { .. } | Item::CopperDrill { .. } => None,
-                        _ => inventory.iter_mut().find(|item_stack| item_stack.item == recipe.output.item)
+                        Item::Tool { .. } => None,
+                        Item::Material { .. } => inventory.iter_mut().find(|item_stack| item_stack.item == recipe.output.item)
                     };
                     match existing_stack {
                         Some(item_stack) => item_stack.count += recipe.output.count,

@@ -1,5 +1,5 @@
-use crate::state::state::{State, Agent, PointOfInterest, DepositType, Recipe, CombatEncounter};
-use crate::spec::common::item_label;
+use crate::state::state::{State, Agent, PointOfInterest, Recipe, CombatEncounter};
+use crate::spec::common::{deposit_type_label, item_label};
 
 /// Where the agent stands, who else is there, and what it can work on.
 pub fn node_lines(state: &State, agent: &Agent) -> Vec<String> {
@@ -17,11 +17,7 @@ pub fn node_lines(state: &State, agent: &Agent) -> Vec<String> {
     for (poi_idx, poi) in node.pois.iter().enumerate() {
         let label = match poi {
             PointOfInterest::ResourceDeposit { name, type_, exposed, stability, reserves, .. } => {
-                let type_label = match type_ {
-                    DepositType::Rock => "rock",
-                    DepositType::Forage => "forage"
-                };
-                format!("{} ({}, exposed {}, stability {}, reserves {})", name, type_label, exposed, stability, reserves)
+                format!("{} ({}, exposed {}, stability {}, reserves {})", name, deposit_type_label(type_), exposed, stability, reserves)
             }
             PointOfInterest::Inspectable { name, .. } => name.clone(),
             PointOfInterest::EnemyGroup { name, enemies } => {
@@ -61,7 +57,7 @@ pub fn crafting_menu_lines(recipes: &Vec<Recipe>) -> Vec<String> {
     lines.push("Recipes:".to_string());
     for (recipe_idx, recipe) in recipes.iter().enumerate() {
         let ingredients = recipe.ingredients.iter()
-            .map(|ingredient| format!("{} {}", ingredient.count, item_label(&ingredient.item)))
+            .map(|(name, count)| format!("{} {}", count, name))
             .collect::<Vec<String>>()
             .join(", ");
         lines.push(format!("[{}] {} <- {}", recipe_idx, item_label(&recipe.output.item), ingredients));

@@ -1,22 +1,37 @@
-use crate::state::state::{State, Item, ItemStack, CombatEncounter};
+use crate::state::state::{State, Item, ItemStack, CombatEncounter, DepositType, ToolAttribute};
 use std::iter::zip;
 
 /// Durability of a tool, or None for items that are not tools.
 pub fn tool_durability(item: &Item) -> Option<usize> {
     match item {
-        Item::CrudePickaxe { durability }
-        | Item::CopperPickaxe { durability }
-        | Item::CopperDrill { durability } => Some(*durability),
-        _ => None
+        Item::Tool { durability, .. } => Some(*durability),
+        Item::Material { .. } => None
     }
 }
 
+pub fn deposit_type_label(deposit_type: &DepositType) -> &'static str {
+    match deposit_type {
+        DepositType::Rock => "rock",
+        DepositType::Forage => "forage"
+    }
+}
+
+/// A material by name; a tool with what it works on, what each swing does, and how many swings it has left.
 pub fn item_label(item: &Item) -> String {
     match item {
-        Item::CrudePickaxe { durability } => format!("CrudePickaxe (durability {durability})"),
-        Item::CopperPickaxe { durability } => format!("CopperPickaxe (durability {durability})"),
-        Item::CopperDrill { durability } => format!("CopperDrill (durability {durability})"),
-        _ => format!("{:?}", item),
+        Item::Material { name } => name.clone(),
+        Item::Tool { name, deposit_type, attributes, durability } => {
+            let mut parts = vec![deposit_type_label(deposit_type).to_string()];
+            for (attribute, amount) in attributes {
+                let attribute_label = match attribute {
+                    ToolAttribute::Chipping => "chipping",
+                    ToolAttribute::Drilling => "drilling"
+                };
+                parts.push(format!("{attribute_label} {amount}"));
+            }
+            parts.push(format!("durability {durability}"));
+            format!("{} ({})", name, parts.join(", "))
+        }
     }
 }
 

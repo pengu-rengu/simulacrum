@@ -1,4 +1,4 @@
-use crate::state::state::{Agent, BodyCell, BodyGrid, DepositType, Enemy, Item, ItemStack, Menu, Node, PointOfInterest, Recipe, State};
+use crate::state::state::{Agent, ToolAttribute, BodyCell, BodyGrid, DepositType, Enemy, Item, ItemStack, Menu, Node, PointOfInterest, Recipe, State};
 
 fn initial_body_grid() -> BodyGrid {
     BodyGrid {
@@ -61,7 +61,7 @@ impl State {
                             exposed: 2,
                             stability: 4,
                             reserves: 20,
-                            yield_: Item::Stick
+                            yield_: Item::Material { name: "Stick".to_string() }
                         },
                         PointOfInterest::ResourceDeposit {
                             name: "Amber Bole".to_string(),
@@ -69,7 +69,7 @@ impl State {
                             exposed: 2,
                             stability: 3,
                             reserves: 15,
-                            yield_: Item::Resin
+                            yield_: Item::Material { name: "Resin".to_string() }
                         },
                         PointOfInterest::ResourceDeposit {
                             name: "Smooth Pebble".to_string(),
@@ -77,38 +77,58 @@ impl State {
                             exposed: 4,
                             stability: 6,
                             reserves: 30,
-                            yield_: Item::SmoothPebble
+                            yield_: Item::Material { name: "Smooth Pebble".to_string()}
                         },
                         PointOfInterest::Inspectable {
                             name: "Ruined Workbench".to_string(),
-                            menu: Menu::CraftingMenu { recipes: vec![Recipe {
-                                output: ItemStack { item: Item::CrudePickaxe { 
-                                    durability: 20
-                                }, count: 1 },
-                                ingredients: vec![
-                                    ItemStack { item: Item::Stick, count: 10 },
-                                    ItemStack { item: Item::SmoothPebble, count: 10 },
-                                ],
-                            },
-                            Recipe {
-                                output: ItemStack { item: Item::CopperPickaxe {
-                                    durability: 40
-                                }, count: 1 },
-                                ingredients: vec![
-                                    ItemStack { item: Item::CopperOre, count: 5 },
-                                    ItemStack { item: Item::Stick, count: 5 }
-                                ]
-                            },
-                            Recipe {
-                                output: ItemStack { item: Item::CopperDrill {
-                                    durability: 20
-                                }, count: 1 },
-                                ingredients: vec![
-                                    ItemStack { item: Item::CopperOre, count: 8 },
-                                    ItemStack { item: Item::Resin, count: 3 },
-                                    ItemStack { item: Item::Stick, count: 5 }
-                                ]
-                            }]}
+                            menu: Menu::CraftingMenu { recipes: vec![
+                                Recipe {
+                                    output: ItemStack { 
+                                        item: Item::Tool { 
+                                            name: "Crude Pickaxe".to_string(),
+                                            deposit_type: DepositType::Rock,
+                                            attributes: vec![(ToolAttribute::Chipping, 1)],
+                                            durability: 20
+                                        }, 
+                                        count: 1 
+                                    },
+                                    ingredients: vec![
+                                        ("Stick".to_string(), 10),
+                                        ("Smooth Pebble".to_string(), 10),
+                                    ],
+                                },
+                                Recipe {
+                                    output: ItemStack {
+                                        item: Item::Tool {
+                                            name: "Copper Pickaxe".to_string(),
+                                            deposit_type: DepositType::Rock,
+                                            attributes: vec![(ToolAttribute::Chipping, 1)],
+                                            durability: 40
+                                        }, 
+                                        count: 1
+                                    },
+                                    ingredients: vec![
+                                        ("Copper Ore".to_string(), 10),
+                                        ("Stick".to_string(), 10)
+                                    ]
+                                },
+                                Recipe {
+                                    output: ItemStack {
+                                        item: Item::Tool {
+                                            name: "Copper Drill".to_string(),
+                                            deposit_type: DepositType::Rock,
+                                            attributes: vec![(ToolAttribute::Drilling, 1)],
+                                            durability: 20
+                                        },
+                                        count: 1
+                                    },
+                                    ingredients: vec![
+                                        ("Copper Ore".to_string(), 8),
+                                        ("Resin".to_string(), 3),
+                                        ("Stick".to_string(), 5)
+                                    ]
+                                }
+                            ]}
                         },
                     ],
                     combat_encounters: vec![]
@@ -123,7 +143,7 @@ impl State {
                             exposed: 2,
                             stability: 10,
                             reserves: 8,
-                            yield_: Item::CopperOre
+                            yield_: Item::Material { name: "Copper Ore".to_string() }
                         },
                         PointOfInterest::EnemyGroup {
                             name: "Husk Pack".to_string(),
