@@ -1,4 +1,4 @@
-use crate::state::state::{State, Input, Action, Message, Item, ItemStack, PointOfInterest, DepositType, Menu, CombatEncounter, ToolAttribute};
+use crate::state::state::{State, Input, NodeworldAction, Message, Item, ItemStack, PointOfInterest, DepositType, Menu, CombatEncounter, ToolAttribute};
 use serde_json::from_str;
 
 pub fn flush_state(state: &State) -> (State, String) {
@@ -126,7 +126,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
         Err(_) => {
             new_state.agents[curr_agent_idx].nodeworld.error_message = Some("could not parse input json".to_string());
         }
-        Ok(input) => {
+        Ok(Input::NodeworldInput(input)) => {
             // each action either succeeds or fails with nothing about the agent changed
             // an agent fights in at most one encounter, wherever it is
             let in_combat = state.nodes.iter()
@@ -134,17 +134,17 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                 .any(|CombatEncounter::Pve { agent_idxs, .. }| agent_idxs.contains(&curr_agent_idx));
 
             let result: Result<(), String> = match input.action {
-                Some(Action::MoveTo(_)) | Some(Action::Harvest { .. }) | Some(Action::Inspect { .. }) | Some(Action::Engage { .. })
+                Some(NodeworldAction::MoveTo(_)) | Some(NodeworldAction::Harvest { .. }) | Some(NodeworldAction::Inspect { .. }) | Some(NodeworldAction::Engage { .. })
                     if curr_agent.nodeworld.open_menu.is_some() =>
                 {
                     Err("you cannot do that while a menu is open".to_string())
                 }
-                Some(Action::MoveTo(_)) | Some(Action::Harvest { .. }) | Some(Action::Inspect { .. }) | Some(Action::Engage { .. })
+                Some(NodeworldAction::MoveTo(_)) | Some(NodeworldAction::Harvest { .. }) | Some(NodeworldAction::Inspect { .. }) | Some(NodeworldAction::Engage { .. })
                     if in_combat =>
                 {
                     Err("you cannot do that while in combat".to_string())
                 }
-                Some(Action::MoveTo(node_name)) => {
+                Some(NodeworldAction::MoveTo(node_name)) => {
                     match state.nodes.iter().position(|node| node.name == node_name) {
                         Some(target_node_idx) => {
                             new_state.agents[curr_agent_idx].nodeworld.node_idx = target_node_idx;
@@ -153,7 +153,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                         None => Err(format!("no node named {node_name}"))
                     }
                 }
-                Some(Action::Harvest { poi_idx, tool_idxs }) => 'harvest: {
+                Some(NodeworldAction::Harvest { poi_idx, tool_idxs }) => 'harvest: {
                     let Some(poi) = state.nodes[curr_node_idx].pois.get(poi_idx) else {
                         break 'harvest Err(format!("no poi at index {poi_idx}"));
                     };
@@ -240,7 +240,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
 
                     if collapsed { Err("deposit collapsed".to_string()) } else { Ok(()) }
                 }
-                Some(Action::Inspect { poi_idx }) => {
+                Some(NodeworldAction::Inspect { poi_idx }) => {
                     match state.nodes[curr_node_idx].pois.get(poi_idx) {
                         None => Err(format!("no poi at index {poi_idx}")),
                         Some(PointOfInterest::Inspectable { menu, .. }) => {
@@ -250,7 +250,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                         Some(_) => Err("nothing to inspect here".to_string())
                     }
                 }
-                Some(Action::Craft(recipe_idx)) => 'craft: {
+                Some(NodeworldAction::Craft(recipe_idx)) => 'craft: {
                     let Some(Menu::CraftingMenu { recipes }) = &curr_agent.nodeworld.open_menu else {
                         break 'craft Err("crafting menu not open".to_string());
                     };
@@ -285,7 +285,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                     new_state.agents[curr_agent_idx].nodeworld.inventory = inventory;
                     Ok(())
                 }
-                Some(Action::Exit) => {
+                Some(NodeworldAction::ExitMenu) => {
                     if curr_agent.nodeworld.open_menu.is_some() {
                         new_state.agents[curr_agent_idx].nodeworld.open_menu = None;
                         Ok(())
@@ -293,7 +293,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                         Err("nothing to exit".to_string())
                     }
                 }
-                Some(Action::Engage { poi_idx }) => 'engage: {
+                Some(NodeworldAction::Engage { poi_idx }) => 'engage: {
                     let Some(poi) = state.nodes[curr_node_idx].pois.get(poi_idx) else {
                         break 'engage Err(format!("no poi at index {poi_idx}"));
                     };

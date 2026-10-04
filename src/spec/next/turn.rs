@@ -2,17 +2,6 @@ use crate::state::state::{State, Message};
 use crate::spec::common::{action_blocked, check_error_and_unchanged};
 use std::iter::zip;
 
-pub fn check_increment(old_state: &State, new_state: &State) {
-    let new_idx = old_state.agent_idx + 1;
-    if new_idx == old_state.agents.len() {
-        assert_eq!(new_state.agent_idx, 0);
-        assert_eq!(new_state.turn, old_state.turn + 1);
-    } else {
-        assert_eq!(new_state.agent_idx, new_idx);
-        assert_eq!(new_state.turn, old_state.turn)
-    }
-}
-
 pub fn check_move_to(old_state: &State, new_state: &State, node_name: &str) {
     if let Some(error) = action_blocked(old_state) {
         check_error_and_unchanged(old_state, new_state, error);

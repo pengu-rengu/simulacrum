@@ -112,18 +112,22 @@ pub struct State {
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Action {
+pub enum NodeworldAction {
     MoveTo(String),
     Harvest { poi_idx: usize, tool_idxs: Vec<Option<usize>> },
     Inspect { poi_idx: usize },
     Craft(usize),
-    Exit,
+    ExitMenu,
     Engage { poi_idx: usize }
 }
 
 #[derive(Deserialize)]
-pub struct Input {
-    pub action: Option<Action>,
+pub struct NodeworldInput {
+    pub action: Option<NodeworldAction>,
     pub send_message: Option<String>
+}
+
+#[derive(Deserialize)]
+pub enum Input {
+    NodeworldInput(NodeworldInput)
 }

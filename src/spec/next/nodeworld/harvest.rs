@@ -58,7 +58,7 @@ impl DepositState {
     }
 }
 
-pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_idxs: Vec<Option<usize>>) {
+pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_idxs: &[Option<usize>]) {
     if let Some(error) = action_blocked(old_state) {
         check_error_and_unchanged(old_state, new_state, error);
         return;
@@ -88,7 +88,7 @@ pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_
 
     for tool_idx in tool_idxs {
         let tool = if let Some(idx) = tool_idx {
-            let Some(item_stack) = acting_agent.nodeworld.inventory.get(idx) else {
+            let Some(item_stack) = acting_agent.nodeworld.inventory.get(*idx) else {
                 check_error_and_unchanged(old_state, new_state, &format!("no item at inventory index {idx}"));
                 return;
             };

@@ -1,19 +1,13 @@
 use crate::spec::assumptions::{agents::check_agent, inventory::check_inventory, combat::check_combat};
+use crate::spec::next::nodeworld::nodeworld::check_nodeworld_next_state;
 use std::collections::HashSet;
-use crate::state::state::{State, Input, Action, Menu};
+use crate::state::state::{State, Input, NodeworldAction, Menu};
 use crate::spec::common::{check_body_grids_unchanged, check_encounters_unchanged, check_error_and_unchanged, check_nodes_unchanged};
-use crate::spec::next::{
-    combat::check_engage,
-    harvest::check_harvest,
-    menu::{check_craft, check_exit, check_inspect},
-    turn::{check_increment, check_move_to, check_send_message, check_messages_unchanged},
-};
 use crate::spec::flush::{
     sections::{error_lines, inventory_lines, message_lines},
     views::{node_lines, crafting_menu_lines},
 };
 use serde_json::from_str;
-use std::iter::zip;
 
 pub fn assumptions(state: &State) {
     assert!(state.agents.len() > 0);
@@ -35,7 +29,15 @@ pub fn assumptions(state: &State) {
 }
 
 pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
-    check_increment(old_state, new_state);
+    let new_idx = old_state.agent_idx + 1;
+    if new_idx == old_state.agents.len() {
+        assert_eq!(new_state.agent_idx, 0);
+        assert_eq!(new_state.turn, old_state.turn + 1);
+    } else {
+        assert_eq!(new_state.agent_idx, new_idx);
+        assert_eq!(new_state.turn, old_state.turn)
+    }
+    
     check_body_grids_unchanged(old_state, new_state);
     check_nodes_unchanged(old_state, new_state);
 
@@ -45,33 +47,13 @@ pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
         return;
     };
 
-    if let Some(message) = input.send_message {
-        check_send_message(old_state, new_state, &message);
+    #[allow(irrefutable_let_patterns)]
+    if let Input::NodeworldInput(nodeworld_input) = input {
+        check_nodeworld_next_state(old_state, new_state, &nodeworld_input);
     } else {
-        check_messages_unchanged(old_state, new_state);
-    }
-
-    if !matches!(input.action, Some(Action::Engage { .. })) {
+        check_error_and_unchanged(old_state, new_state, "could not parse input json");
         check_encounters_unchanged(old_state, new_state);
-    }
-
-    match input.action {
-        Some(Action::MoveTo(node_name)) => check_move_to(old_state, new_state, &node_name),
-        Some(Action::Harvest { poi_idx, tool_idxs }) => check_harvest(old_state, new_state, poi_idx, tool_idxs),
-        Some(Action::Inspect { poi_idx }) => check_inspect(old_state, new_state, poi_idx),
-        Some(Action::Craft(recipe_idx)) => check_craft(old_state, new_state, recipe_idx),
-        Some(Action::Exit) => check_exit(old_state, new_state),
-        Some(Action::Engage { poi_idx }) => check_engage(old_state, new_state, poi_idx),
-        None => {
-            for (i, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
-                if i != old_state.agent_idx {
-                    assert_eq!(new_agent.nodeworld.error_message, old_agent.nodeworld.error_message)
-                }
-                assert_eq!(new_agent.nodeworld.body_grid, old_agent.nodeworld.body_grid);
-                assert_eq!(new_agent.nodeworld.open_menu, old_agent.nodeworld.open_menu);
-                assert_eq!(new_agent.nodeworld.inventory, old_agent.nodeworld.inventory);
-            }
-        }
+        return;
     }
 }
 
