@@ -1,7 +1,7 @@
 use crate::spec::spec::{assumptions, check_next_state, check_flush_state};
 use crate::state::state::{State, Node, BodyGrid, BodyCell, Item, ItemStack, PointOfInterest, DepositType, Menu, Recipe, CombatEncounter, Enemy, ToolAttribute};
 use crate::impl_::next_state::{flush_state, next_state};
-use crate::state::agent::{Agent, NodeworldAgent};
+use crate::state::agent::{Agent, EscapeRoomAgent, NodeworldAgent};
 use std::iter::zip;
 
 fn mock_states() -> Vec<State> {
@@ -160,6 +160,11 @@ fn mock_states() -> Vec<State> {
                                 } else {
                                     None
                                 }
+                            },
+                            escape_room: EscapeRoomAgent {
+                                room_idx: 0,
+                                x: 0,
+                                y: 0
                             }
                         }).collect();
                         let at_node_0 = (0..num_agents)
@@ -219,7 +224,8 @@ fn mock_states() -> Vec<State> {
                                     vec![]
                                 },
                                 combat_encounters: if n == 0 { encounters.clone() } else { vec![] }
-                            }).collect()
+                            }).collect(),
+                            rooms: vec![]
                         });
                     }
                     }

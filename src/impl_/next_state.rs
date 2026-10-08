@@ -126,6 +126,9 @@ pub fn next_state(state: &State, input_str: &str) -> State {
         Err(_) => {
             new_state.agents[curr_agent_idx].nodeworld.error_message = Some("could not parse input json".to_string());
         }
+        Ok(Input::EscapeRoomInput(_)) => {
+            new_state.agents[curr_agent_idx].nodeworld.error_message = Some("could not parse input json".to_string());
+        }
         Ok(Input::NodeworldInput(input)) => {
             // each action either succeeds or fails with nothing about the agent changed
             // an agent fights in at most one encounter, wherever it is
