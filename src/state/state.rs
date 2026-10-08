@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
-
-use crate::state::agent::Agent;
+use crate::state::{
+    agent::Agent, escaperoom::{EscapeRoomInput, Room}
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum Universe {
@@ -108,7 +109,8 @@ pub struct State {
     pub turn: usize,
     pub agent_idx: usize,
     pub agents: Vec<Agent>,
-    pub nodes: Vec<Node>
+    pub nodes: Vec<Node>,
+    pub rooms: Vec<Room>
 }
 
 #[derive(Deserialize)]
@@ -121,6 +123,7 @@ pub enum NodeworldAction {
     Engage { poi_idx: usize }
 }
 
+
 #[derive(Deserialize)]
 pub struct NodeworldInput {
     pub action: Option<NodeworldAction>,
@@ -128,6 +131,11 @@ pub struct NodeworldInput {
 }
 
 #[derive(Deserialize)]
+pub enum Direction { Up, Down, Left, Right }
+
+
+#[derive(Deserialize)]
 pub enum Input {
-    NodeworldInput(NodeworldInput)
+    NodeworldInput(NodeworldInput),
+    EscapeRoomInput(EscapeRoomInput)
 }

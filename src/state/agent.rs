@@ -5,7 +5,8 @@ use crate::state::state::{Message, BodyGrid, ItemStack, Menu};
 
 pub struct Agent {
     pub name: String,
-    pub nodeworld: NodeworldAgent
+    pub nodeworld: NodeworldAgent,
+    pub escape_room: EscapeRoomAgent
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -16,4 +17,11 @@ pub struct NodeworldAgent {
     pub body_grid: BodyGrid,
     pub inventory: Vec<ItemStack>,
     pub open_menu: Option<Menu>
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct EscapeRoomAgent {
+    pub room_idx: usize,
+    pub x: usize,
+    pub y: usize
 }

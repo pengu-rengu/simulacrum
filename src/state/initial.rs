@@ -1,5 +1,6 @@
 use crate::state::state::{ToolAttribute, BodyCell, BodyGrid, DepositType, Enemy, Item, ItemStack, Menu, Node, PointOfInterest, Recipe, State};
-use crate::state::agent::{Agent, NodeworldAgent};
+use crate::state::escaperoom::{DoorCell, EscapeRoomCell, Room};
+use crate::state::agent::{Agent, EscapeRoomAgent, NodeworldAgent};
 
 fn initial_body_grid() -> BodyGrid {
     BodyGrid {
@@ -26,6 +27,34 @@ fn amber_husk() -> Enemy {
     }
 }
 
+fn room_from_str(name: &str, s: &str) -> Room {
+    let mut cells = vec![];
+    let mut width = 0;
+    let mut height = 0;
+    for line in s.lines().skip(1) {
+        width = line.len();
+        height += 1;
+        for char in line.chars() {
+            cells.push(match char {
+                ' ' => EscapeRoomCell::Empty,
+                'x' => EscapeRoomCell::Wall,
+                'A' | 'B' | 'C' | 'D' |
+                'a' | 'b' | 'c' | 'd' => EscapeRoomCell::Door(DoorCell {
+                    id: char.to_uppercase().to_string(),
+                    open: char.is_lowercase()
+                }),
+                _ => panic!("Invalid character in string: {}", char)
+            });
+        }
+    }
+    Room {
+        name: name.to_string(),
+        width: width,
+        height: height,
+        cells: cells
+    }
+}
+
 impl State {
     pub fn new() -> State {
         State { 
@@ -41,6 +70,11 @@ impl State {
                         body_grid: initial_body_grid(),
                         inventory: vec![],
                         open_menu: None
+                    },
+                    escape_room: EscapeRoomAgent {
+                        room_idx: 0,
+                        x: 0,
+                        y: 0
                     }
                 },
                 Agent {
@@ -52,6 +86,11 @@ impl State {
                         body_grid: initial_body_grid(),
                         inventory: vec![],
                         open_menu: None
+                    },
+                    escape_room: EscapeRoomAgent {
+                        room_idx: 0,
+                        x: 0,
+                        y: 0
                     }
                 },
             ],
@@ -157,6 +196,15 @@ impl State {
                     ],
                     combat_encounters: vec![]
                 }
+            ],
+            rooms: vec![
+                room_from_str("Room A", "
+                    xxxxx
+                    x   x
+                    x   x
+                    x   x
+                    xxxxx
+                ")
             ]
         }
     }
