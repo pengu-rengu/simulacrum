@@ -164,7 +164,8 @@ fn mock_states() -> Vec<State> {
                             escape_room: EscapeRoomAgent {
                                 room_idx: 0,
                                 x: 0,
-                                y: 0
+                                y: 0,
+                                messages_inbox: vec![]
                             }
                         }).collect();
                         let at_node_0 = (0..num_agents)

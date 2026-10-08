@@ -8,6 +8,9 @@ pub fn check_agent(state: &State, agent: &Agent) {
     for message in &nodeworld_agent.node_messages_inbox {
         assert!(message.sender_agent_idx < state.agents.len());
     }
+    for message in &agent.escape_room.messages_inbox {
+        assert!(message.sender_agent_idx < state.agents.len());
+    }
 
     // a menu is only open where the thing it belongs to stands
     if let Some(open_menu) = &nodeworld_agent.open_menu {

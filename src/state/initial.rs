@@ -74,7 +74,8 @@ impl State {
                     escape_room: EscapeRoomAgent {
                         room_idx: 0,
                         x: 0,
-                        y: 0
+                        y: 0,
+                        messages_inbox: vec![]
                     }
                 },
                 Agent {
@@ -90,7 +91,8 @@ impl State {
                     escape_room: EscapeRoomAgent {
                         room_idx: 0,
                         x: 0,
-                        y: 0
+                        y: 0,
+                        messages_inbox: vec![]
                     }
                 },
             ],

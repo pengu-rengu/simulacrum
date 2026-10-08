@@ -23,5 +23,6 @@ pub struct NodeworldAgent {
 pub struct EscapeRoomAgent {
     pub room_idx: usize,
     pub x: usize,
-    pub y: usize
+    pub y: usize,
+    pub messages_inbox: Vec<Message>
 }

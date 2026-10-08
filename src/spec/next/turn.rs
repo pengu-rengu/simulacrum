@@ -28,7 +28,7 @@ pub fn check_move_to(old_state: &State, new_state: &State, node_name: &str) {
     }
 }
 
-pub fn check_send_message(old_state: &State, new_state: &State, content: &str) {
+pub fn check_send_nodeworld_message(old_state: &State, new_state: &State, content: &str) {
     let curr_node_idx = old_state.agents[old_state.agent_idx].nodeworld.node_idx;
     for (old_agent, new_agent) in zip(&old_state.agents, &new_state.agents) {
         if old_agent.nodeworld.node_idx != curr_node_idx {
@@ -49,8 +49,29 @@ pub fn check_send_message(old_state: &State, new_state: &State, content: &str) {
     }
 }
 
-pub fn check_messages_unchanged(old_state: &State, new_state: &State) {
+pub fn check_nodeworld_messages_unchanged(old_state: &State, new_state: &State) {
     for (old_agent, new_agent) in zip(&old_state.agents, &new_state.agents) {
         assert_eq!(new_agent.nodeworld.node_messages_inbox, old_agent.nodeworld.node_messages_inbox);
+    }
+}
+
+pub fn check_send_escaperoom_message(old_state: &State, new_state: &State, content: &str) {
+    for (old_agent, new_agent) in zip(&old_state.agents, &new_state.agents) {
+        if let Some((last, rest)) = new_agent.escape_room.messages_inbox.split_last() {
+            let new_message = Message {
+                sender_agent_idx: old_state.agent_idx,
+                content: content.to_string()
+            };
+            assert_eq!(*last, new_message);
+            assert_eq!(rest, old_agent.escape_room.messages_inbox);
+        } else {
+            panic!("new messages cannot be empty")
+        }
+    }
+}
+
+pub fn check_escaperoom_message_unchanged(old_state: &State, new_state: &State) {
+    for (old_agent, new_agent) in zip(&old_state.agents, &new_state.agents) {
+        assert_eq!(new_agent.escape_room.messages_inbox, old_agent.escape_room.messages_inbox);
     }
 }

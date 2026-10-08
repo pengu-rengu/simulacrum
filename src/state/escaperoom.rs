@@ -1,18 +1,18 @@
 use serde::{Serialize, Deserialize};
 use crate::state::state::Direction;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct DoorCell {
     pub id: String,
     pub open: bool
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum EscapeRoomCell {
     Empty, Wall, Door(DoorCell)
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Room {
     pub name: String,
     pub width: usize,
@@ -27,6 +27,6 @@ pub enum EscapeRoomAction {
 
 #[derive(Deserialize)]
 pub struct EscapeRoomInput {
-    pub action: Option<EscapeRoomAction>,
+    pub actions: Vec<EscapeRoomAction>,
     pub send_message: Option<String>
 }

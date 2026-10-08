@@ -1,4 +1,5 @@
-use crate::state::state::{State, Input, NodeworldAction, Message, Item, ItemStack, PointOfInterest, DepositType, Menu, CombatEncounter, ToolAttribute};
+use crate::state::escaperoom::{EscapeRoomAction, EscapeRoomCell};
+use crate::state::state::{State, Input, NodeworldAction, Message, Item, ItemStack, PointOfInterest, DepositType, Menu, CombatEncounter, ToolAttribute, Direction};
 use serde_json::from_str;
 
 pub fn flush_state(state: &State) -> (State, String) {
@@ -126,8 +127,67 @@ pub fn next_state(state: &State, input_str: &str) -> State {
         Err(_) => {
             new_state.agents[curr_agent_idx].nodeworld.error_message = Some("could not parse input json".to_string());
         }
-        Ok(Input::EscapeRoomInput(_)) => {
-            new_state.agents[curr_agent_idx].nodeworld.error_message = Some("could not parse input json".to_string());
+        Ok(Input::EscapeRoomInput(input)) => {
+            new_state.agents[curr_agent_idx].nodeworld.error_message = None;
+            let room_idx = curr_agent.escape_room.room_idx;
+            let mut x = curr_agent.escape_room.x;
+            let mut y = curr_agent.escape_room.y;
+
+            if room_idx < new_state.rooms.len() {
+                for action in &input.actions {
+                    let next = match action {
+                        EscapeRoomAction::Move { direction } | EscapeRoomAction::Interact { direction } => match direction {
+                            Direction::Up => y.checked_sub(1).map(|next_y| (x, next_y)),
+                            Direction::Down => y.checked_add(1).map(|next_y| (x, next_y)),
+                            Direction::Left => x.checked_sub(1).map(|next_x| (next_x, y)),
+                            Direction::Right => x.checked_add(1).map(|next_x| (next_x, y))
+                        }
+                    };
+                    let Some((next_x, next_y)) = next else { continue };
+                    match action {
+                        EscapeRoomAction::Move { .. } => {
+                            let room = &new_state.rooms[room_idx];
+                            if next_x >= room.width || next_y >= room.height { continue; }
+                            let Some(cell) = room.cells.get(next_y * room.width + next_x) else { continue };
+                            let can_enter = match cell {
+                                EscapeRoomCell::Empty => true,
+                                EscapeRoomCell::Door(door) => door.open,
+                                EscapeRoomCell::Wall => false
+                            };
+                            if can_enter {
+                                x = next_x;
+                                y = next_y;
+                            }
+                        }
+                        EscapeRoomAction::Interact { .. } => {
+                            let id = {
+                                let room = &new_state.rooms[room_idx];
+                                if next_x >= room.width || next_y >= room.height { continue; }
+                                let Some(EscapeRoomCell::Door(door)) = room.cells.get(next_y * room.width + next_x) else { continue };
+                                door.id.clone()
+                            };
+                            for cell in &mut new_state.rooms[room_idx].cells {
+                                if let EscapeRoomCell::Door(door) = cell {
+                                    if door.id == id {
+                                        door.open = !door.open;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            new_state.agents[curr_agent_idx].escape_room.x = x;
+            new_state.agents[curr_agent_idx].escape_room.y = y;
+
+            if let Some(content) = input.send_message {
+                for agent in &mut new_state.agents {
+                    agent.escape_room.messages_inbox.push(Message {
+                        sender_agent_idx: curr_agent_idx,
+                        content: content.clone()
+                    });
+                }
+            }
         }
         Ok(Input::NodeworldInput(input)) => {
             // each action either succeeds or fails with nothing about the agent changed

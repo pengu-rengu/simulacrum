@@ -1,4 +1,5 @@
 use crate::spec::assumptions::{agents::check_agent, inventory::check_inventory, combat::check_combat};
+use crate::spec::next::escaperoom::escaperoom::check_escaperoom_next_state;
 use crate::spec::next::nodeworld::nodeworld::check_nodeworld_next_state;
 use std::collections::HashSet;
 use crate::state::state::{State, Input, NodeworldAction, Menu};
@@ -47,13 +48,13 @@ pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
         return;
     };
 
-    #[allow(irrefutable_let_patterns)]
-    if let Input::NodeworldInput(nodeworld_input) = input {
-        check_nodeworld_next_state(old_state, new_state, &nodeworld_input);
-    } else {
-        check_error_and_unchanged(old_state, new_state, "could not parse input json");
-        check_encounters_unchanged(old_state, new_state);
-        return;
+    match input {
+        Input::NodeworldInput(nodeworld_input) => {
+            check_nodeworld_next_state(old_state, new_state, &nodeworld_input);
+        }
+        Input::EscapeRoomInput(escaperoom_input) => {
+            check_escaperoom_next_state(old_state, new_state, &escaperoom_input);
+        }
     }
 }
 
