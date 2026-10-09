@@ -1,4 +1,5 @@
-use crate::state::state::{CombatEncounter, PointOfInterest, State};
+use crate::state::state::State;
+use crate::state::nodeworld::{CombatEncounter, PointOfInterest};
 use std::collections::HashSet;
 
 pub fn check_combat(state: &State) {

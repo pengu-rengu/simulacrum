@@ -1,7 +1,8 @@
 use std::iter::zip;
 
-use crate::state::state::{CombatEncounter, PointOfInterest, State};
-use crate::spec::common::{action_blocked, check_encounters_unchanged, check_error_and_unchanged};
+use crate::state::state::State;
+use crate::state::nodeworld::{CombatEncounter, PointOfInterest};
+use crate::spec::common::{action_blocked, check_encounters_unchanged, check_error_and_nodeworld_unchanged};
 
 pub fn check_engage(old_state: &State, new_state: &State, poi_idx: usize) {
     let acting_agent_idx = old_state.agent_idx;
@@ -9,7 +10,7 @@ pub fn check_engage(old_state: &State, new_state: &State, poi_idx: usize) {
     let node_idx = acting_agent.nodeworld.node_idx;
 
     let fail = |expected: &str| {
-        check_error_and_unchanged(old_state, new_state, expected);
+        check_error_and_nodeworld_unchanged(old_state, new_state, expected);
         check_encounters_unchanged(old_state, new_state);
     };
 

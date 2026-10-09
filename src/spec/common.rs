@@ -1,4 +1,5 @@
-use crate::state::state::{State, Item, ItemStack, CombatEncounter, DepositType, ToolAttribute};
+use crate::state::state::State; 
+use crate::state::nodeworld::{Item, ItemStack, CombatEncounter, DepositType, ToolAttribute};
 use std::iter::zip;
 
 /// Durability of a tool, or None for items that are not tools.
@@ -67,7 +68,7 @@ pub fn action_blocked(state: &State) -> Option<&'static str> {
     None
 }
 
-pub fn check_error_and_unchanged(old_state: &State, new_state: &State, expected: &str) {
+pub fn check_error_and_nodeworld_unchanged(old_state: &State, new_state: &State, expected: &str) {
     let acting_agent_idx = old_state.agent_idx;
     let old_agent = &old_state.agents[acting_agent_idx];
     let new_agent = &new_state.agents[acting_agent_idx];

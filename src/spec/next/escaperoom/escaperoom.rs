@@ -1,7 +1,8 @@
 use std::iter::zip;
 
 use crate::state::escaperoom::{EscapeRoomAction, EscapeRoomCell, EscapeRoomInput, Room};
-use crate::state::state::{Direction, Message, State};
+use crate::state::state::{Message, State};
+use crate::state::escaperoom::Direction;
 
 fn step(x: usize, y: usize, direction: &Direction, room: &Room) -> (usize, usize) {
     let (next_x, next_y) = match direction {

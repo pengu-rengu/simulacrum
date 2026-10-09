@@ -1,16 +1,16 @@
 use crate::state::state::{State, Message};
-use crate::spec::common::{action_blocked, check_error_and_unchanged};
+use crate::spec::common::{action_blocked, check_error_and_nodeworld_unchanged};
 use std::iter::zip;
 
 pub fn check_move_to(old_state: &State, new_state: &State, node_name: &str) {
     if let Some(error) = action_blocked(old_state) {
-        check_error_and_unchanged(old_state, new_state, error);
+        check_error_and_nodeworld_unchanged(old_state, new_state, error);
         return;
     }
 
     let acting_agent_idx = old_state.agent_idx;
     let Some(target_node_idx) = old_state.nodes.iter().position(|node| node.name == node_name) else {
-        check_error_and_unchanged(old_state, new_state, &format!("no node named {node_name}"));
+        check_error_and_nodeworld_unchanged(old_state, new_state, &format!("no node named {node_name}"));
         return;
     };
 

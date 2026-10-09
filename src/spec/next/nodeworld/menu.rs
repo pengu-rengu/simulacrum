@@ -1,12 +1,13 @@
 use std::iter::zip;
 
-use crate::state::state::{Item, Menu, PointOfInterest, State};
-use crate::spec::common::{action_blocked, check_error_and_unchanged, inventory_with};
+use crate::state::nodeworld::{Item, Menu, PointOfInterest};
+use crate::state::state::State;
+use crate::spec::common::{action_blocked, check_error_and_nodeworld_unchanged, inventory_with};
 
 /// Inspecting is how a menu is opened; only the workbench has one.
 pub fn check_inspect(old_state: &State, new_state: &State, poi_idx: usize) {
     if let Some(error) = action_blocked(old_state) {
-        check_error_and_unchanged(old_state, new_state, error);
+        check_error_and_nodeworld_unchanged(old_state, new_state, error);
         return;
     }
 
@@ -15,13 +16,13 @@ pub fn check_inspect(old_state: &State, new_state: &State, poi_idx: usize) {
     let poi = old_state.nodes[acting_agent.nodeworld.node_idx].pois.get(poi_idx);
 
     match poi {
-        None => check_error_and_unchanged(old_state, new_state, &format!("no poi at index {poi_idx}")),
+        None => check_error_and_nodeworld_unchanged(old_state, new_state, &format!("no poi at index {poi_idx}")),
         Some(PointOfInterest::Inspectable { name: _, menu }) => {
             assert_eq!(new_state.agents[acting_agent_idx].nodeworld.open_menu, Some(menu.clone()));
             assert_eq!(new_state.agents[acting_agent_idx].error_message, None);
             assert_eq!(new_state.agents[acting_agent_idx].nodeworld.inventory, old_state.agents[acting_agent_idx].nodeworld.inventory);
         }
-        Some(_) => check_error_and_unchanged(old_state, new_state, "nothing to inspect here"),
+        Some(_) => check_error_and_nodeworld_unchanged(old_state, new_state, "nothing to inspect here"),
     }
 }
 
@@ -30,12 +31,12 @@ pub fn check_craft(old_state: &State, new_state: &State, recipe_idx: usize) {
     let acting_agent = &old_state.agents[acting_agent_idx];
 
     let Some(Menu::CraftingMenu{ recipes }) = &acting_agent.nodeworld.open_menu else {
-        check_error_and_unchanged(old_state, new_state, "crafting menu not open");
+        check_error_and_nodeworld_unchanged(old_state, new_state, "crafting menu not open");
         return;
     };
 
     let Some(recipe) = recipes.get(recipe_idx) else {
-        check_error_and_unchanged(old_state, new_state, &format!("no recipe at index {recipe_idx}"));
+        check_error_and_nodeworld_unchanged(old_state, new_state, &format!("no recipe at index {recipe_idx}"));
         return;
     };
 
@@ -57,7 +58,7 @@ pub fn check_craft(old_state: &State, new_state: &State, recipe_idx: usize) {
         }
 
         if !affordable {
-            check_error_and_unchanged(old_state, new_state, "not enough items to craft recipe");
+            check_error_and_nodeworld_unchanged(old_state, new_state, "not enough items to craft recipe");
             return;
         }
     }
@@ -83,7 +84,7 @@ pub fn check_exit(old_state: &State, new_state: &State) {
     let acting_agent = &old_state.agents[acting_agent_idx];
 
     if acting_agent.nodeworld.open_menu.is_none() {
-        check_error_and_unchanged(old_state, new_state, "nothing to exit");
+        check_error_and_nodeworld_unchanged(old_state, new_state, "nothing to exit");
         return;
     }
 

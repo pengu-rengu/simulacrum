@@ -1,5 +1,6 @@
-use crate::state::state::{State, PointOfInterest, Item, ItemStack, DepositType, ToolAttribute};
-use crate::spec::common::{action_blocked, check_error_and_unchanged, tool_durability};
+use crate::state::state::{State};
+use crate::state::nodeworld::{PointOfInterest, Item, ItemStack, DepositType, ToolAttribute};
+use crate::spec::common::{action_blocked, check_error_and_nodeworld_unchanged, tool_durability};
 use std::collections::{HashMap};
 use std::iter::zip;
 
@@ -57,7 +58,7 @@ impl DepositState {
 
 pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_idxs: &[Option<usize>]) {
     if let Some(error) = action_blocked(old_state) {
-        check_error_and_unchanged(old_state, new_state, error);
+        check_error_and_nodeworld_unchanged(old_state, new_state, error);
         return;
     }
 
@@ -65,12 +66,12 @@ pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_
     let acting_agent = &old_state.agents[acting_agent_idx];
 
     let Some(poi) = old_state.nodes[acting_agent.nodeworld.node_idx].pois.get(poi_idx) else {
-        check_error_and_unchanged(old_state, new_state, &format!("no poi at index {poi_idx}"));
+        check_error_and_nodeworld_unchanged(old_state, new_state, &format!("no poi at index {poi_idx}"));
         return;
     };
 
     let PointOfInterest::ResourceDeposit { name: _, type_, exposed, stability, reserves, yield_ } = poi else { 
-        check_error_and_unchanged(old_state, new_state, "cannot harvest this poi");
+        check_error_and_nodeworld_unchanged(old_state, new_state, "cannot harvest this poi");
         return;
     };
 
@@ -86,13 +87,13 @@ pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_
     for tool_idx in tool_idxs {
         let tool = if let Some(idx) = tool_idx {
             let Some(item_stack) = acting_agent.nodeworld.inventory.get(*idx) else {
-                check_error_and_unchanged(old_state, new_state, &format!("no item at inventory index {idx}"));
+                check_error_and_nodeworld_unchanged(old_state, new_state, &format!("no item at inventory index {idx}"));
                 return;
             };
             Some(&item_stack.item)
         } else { None };
         if Some(type_) != tool_deposit_type(tool).as_ref() {
-            check_error_and_unchanged(old_state, new_state, &format!("this tool has no use here"));
+            check_error_and_nodeworld_unchanged(old_state, new_state, &format!("this tool has no use here"));
             return;
         }
         

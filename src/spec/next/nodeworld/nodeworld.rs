@@ -1,9 +1,12 @@
 use std::iter::zip;
 
-use crate::{
-    spec::{
-        common::{check_body_grids_unchanged, check_encounters_unchanged, check_nodes_unchanged}, next::nodeworld::{combat::check_engage, harvest::check_harvest, menu::{check_craft, check_exit, check_inspect}, turn::{check_send_nodeworld_message, check_nodeworld_messages_unchanged, check_move_to}}}, state::state::{NodeworldAction, NodeworldInput, State}
-    };
+use crate::spec::common::{check_body_grids_unchanged, check_encounters_unchanged, check_nodes_unchanged};
+use crate::spec::next::nodeworld::combat::check_engage;
+use crate::spec::next::nodeworld::harvest::check_harvest;
+use crate::spec::next::nodeworld::menu::{check_craft, check_exit, check_inspect};
+use crate::spec::next::nodeworld::turn::{check_send_nodeworld_message, check_nodeworld_messages_unchanged, check_move_to};
+use crate::state::state::State;
+use crate::state::nodeworld::{NodeworldAction, NodeworldInput};
 
 
 pub fn check_nodeworld_next_state(old_state: &State, new_state: &State, input: &NodeworldInput) {

@@ -1,5 +1,6 @@
-use crate::state::state::{PointOfInterest, State};
-use crate::state::agent::Agent;
+use crate::state::state::State;
+use crate::state::nodeworld::PointOfInterest;
+use crate::state::state::Agent;
 
 pub fn check_agent(state: &State, agent: &Agent) {
     let nodeworld_agent = &agent.nodeworld;

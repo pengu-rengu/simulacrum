@@ -1,5 +1,5 @@
 use crate::state::state::State;
-use crate::state::agent::Agent;
+use crate::state::state::Agent;
 use crate::spec::common::item_label;
 
 /// What the agent carries, indexed the way `harvest` expects a `tool_idx`.

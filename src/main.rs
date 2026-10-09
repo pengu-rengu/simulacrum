@@ -3,13 +3,11 @@ mod spec;
 mod state;
 
 use state::state::State;
-use std::{
-    fs::{File, write, read_to_string},
-    path::PathBuf,
-    thread::sleep,
-    time::Duration,
-    env::args
-};
+use std::fs::{File, write, read_to_string};
+use std::path::PathBuf;
+use std::thread::sleep;
+use std::time::Duration;
+use std::env::args;
 use impl_::next_state::{flush_state, next_state};
 use spec::check::check;
 
@@ -32,6 +30,7 @@ fn main() -> Result<(), std::io::Error> {
         let path = agent_file_path(&agent.name);
         File::create(path)?;
     }
+
     loop {
         let (flushed_state, output) = flush_state(&state);
         

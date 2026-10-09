@@ -1,6 +1,6 @@
 use crate::spec::common::tool_durability;
-use crate::state::state::Item;
-use crate::state::agent::Agent;
+use crate::state::nodeworld::Item;
+use crate::state::state::Agent;
 
 pub fn check_inventory(agent: &Agent) {
     let nodeworld_agent = &agent.nodeworld;

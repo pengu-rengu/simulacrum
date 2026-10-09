@@ -1,6 +1,7 @@
-use crate::state::state::{State, PointOfInterest, Recipe, CombatEncounter};
+use crate::state::state::State;
+use crate::state::nodeworld::{PointOfInterest, Recipe, CombatEncounter};
 use crate::spec::common::{deposit_type_label, item_label};
-use crate::state::agent::Agent;
+use crate::state::state::Agent;
 
 pub fn node_lines(state: &State, agent: &Agent) -> Vec<String> {
     let node = &state.nodes[agent.nodeworld.node_idx];
