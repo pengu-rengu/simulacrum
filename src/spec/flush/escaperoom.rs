@@ -26,7 +26,7 @@ pub fn check_flush_escaperoom_state(old_state: &State, new_state: &State, output
         
         if !agent_on_cell {
             match cell {
-                EscapeRoomCell::Empty => expected_output += " ",
+                EscapeRoomCell::Empty | EscapeRoomCell::Spawn(_) => expected_output += " ",
                 EscapeRoomCell::Wall => expected_output += "x",
                 EscapeRoomCell::Door(door) => {
                     if door.open {
@@ -34,7 +34,8 @@ pub fn check_flush_escaperoom_state(old_state: &State, new_state: &State, output
                     } else {
                         expected_output += &door.id.to_uppercase();
                     }
-                }
+                },
+                EscapeRoomCell::Exit => expected_output += "E"
             }
         }
         if x == room.width - 1 {

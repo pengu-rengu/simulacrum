@@ -9,7 +9,7 @@ pub struct DoorCell {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum EscapeRoomCell {
-    Empty, Wall, Door(DoorCell)
+    Empty, Wall, Door(DoorCell), Exit, Spawn(usize)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -37,7 +37,8 @@ pub struct EscapeRoomAgent {
     pub room_idx: usize,
     pub x: usize,
     pub y: usize,
-    pub messages_inbox: Vec<Message>
+    pub messages_inbox: Vec<Message>,
+    pub finished: bool
 }
 
 

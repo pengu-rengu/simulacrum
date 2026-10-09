@@ -48,7 +48,8 @@ fn mock_states() -> Vec<State> {
             room_idx: 0,
             x,
             y,
-            messages_inbox: inbox
+            messages_inbox: inbox,
+            finished: false
         }
     };
     let state = |agent_idx: usize, agents: Vec<Agent>| State {

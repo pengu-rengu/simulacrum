@@ -25,7 +25,7 @@ pub fn flush_state(state: &State) -> (State, String) {
             }
             if !agent_on_cell {
                 match cell {
-                    EscapeRoomCell::Empty => output += " ",
+                    EscapeRoomCell::Empty | EscapeRoomCell::Spawn(_) => output += " ",
                     EscapeRoomCell::Wall => output += "x",
                     EscapeRoomCell::Door(door) => {
                         if door.open {
@@ -34,6 +34,7 @@ pub fn flush_state(state: &State) -> (State, String) {
                             output += &door.id.to_uppercase();
                         }
                     }
+                    EscapeRoomCell::Exit => output += "E"
                 }
             }
             if x == room.width - 1 {
@@ -205,9 +206,9 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                                 let (next_x, next_y) = step(x, y, direction, room);
                                 let cell = &room.cells[next_y * room.width + next_x];
                                 let can_enter = match cell {
-                                    EscapeRoomCell::Empty => true,
+                                    EscapeRoomCell::Empty | EscapeRoomCell::Spawn(_) => true,
                                     EscapeRoomCell::Door(door) => door.open,
-                                    EscapeRoomCell::Wall => false
+                                    EscapeRoomCell::Wall | EscapeRoomCell::Exit => false
                                 };
                                 if can_enter {
                                     x = next_x;
