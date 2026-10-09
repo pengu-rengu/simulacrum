@@ -41,52 +41,57 @@ fn escaperoom_move(agent: &mut EscapeRoomAgent, rooms: &[Room], direction: &Dire
 }
 
 fn escaperoom_interact(agent: &mut EscapeRoomAgent, acting_agent_idx: usize, rooms: &mut [Room], direction: &Direction) {
-    let maybe_next_room = rooms.get(agent.room_idx + 1)
-                                            .map(|room| room.clone());
-
-    let room = &mut rooms[agent.room_idx];
-    let (next_x, next_y) = step(agent.x, agent.y, direction, room);
-
-    let door_id = {
-        let EscapeRoomCell::Door(door) = &room.cells[next_y * room.width + next_x] else { return };
-        door.id.clone()
+    let room_idx = agent.room_idx;
+    let faced = {
+        let room = &rooms[room_idx];
+        let (next_x, next_y) = step(agent.x, agent.y, direction, room);
+        room.cells[next_y * room.width + next_x].clone()
     };
 
-    for cell in &mut room.cells {
-        match cell {
-            EscapeRoomCell::Door(door) => {
-                if door.id == door_id {
-                    door.open = !door.open;
-                }
-            }
-            EscapeRoomCell::Exit => {
-                if let Some(next_room) = &maybe_next_room {
-                    agent.room_idx += 1;
-
-                    let mut found_spawn = false;
-                    for (i, cell) in next_room.cells.iter().enumerate() {
-                        if let EscapeRoomCell::Spawn(agent_idx) = cell
-                        && *agent_idx == acting_agent_idx {
-                            agent.x = i % next_room.width;
-                            agent.y = i / next_room.width;
-                            found_spawn = true;
-                            break;
-                        }
+    match faced {
+        EscapeRoomCell::Door(door) => {
+            let door_id = door.id;
+            for cell in &mut rooms[room_idx].cells {
+                if let EscapeRoomCell::Door(door) = cell {
+                    if door.id == door_id {
+                        door.open = !door.open;
                     }
-
-                    if !found_spawn { panic!("spawn not found"); }
-                } else {
-                    agent.finished = true;
                 }
             }
-            _ => {}
         }
+        EscapeRoomCell::Exit => {
+            if rooms.get(room_idx + 1).is_some() {
+                let next_room = rooms[room_idx + 1].clone();
+                agent.room_idx += 1;
+                let mut found_spawn = false;
+                for (i, cell) in next_room.cells.iter().enumerate() {
+                    if let EscapeRoomCell::Spawn(spawn_agent_idx) = cell
+                    && *spawn_agent_idx == acting_agent_idx {
+                        agent.x = i % next_room.width;
+                        agent.y = i / next_room.width;
+                        found_spawn = true;
+                        break;
+                    }
+                }
+                if !found_spawn { panic!("spawn not found"); }
+            } else {
+                agent.finished = true;
+            }
+        }
+        _ => {}
     }
 }
 
 pub fn check_escaperoom_next_state(old_state: &State, new_state: &State, input: &EscapeRoomInput) {
     let acting_agent_idx = old_state.agent_idx;
     let mut expected_agent = old_state.agents[acting_agent_idx].escape_room.clone();
+    if expected_agent.finished {
+        for (new_agent, old_agent) in zip(&new_state.agents, &old_state.agents) {
+            assert_eq!(new_agent.escape_room, old_agent.escape_room);
+        }
+        return;
+    }
+
     let mut rooms = old_state.rooms.clone();
 
     for action in &input.actions {
@@ -102,11 +107,11 @@ pub fn check_escaperoom_next_state(old_state: &State, new_state: &State, input: 
 
     assert_eq!(new_state.rooms, rooms);
     for (i, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
-        if i == acting_agent_idx {
-            assert_eq!(new_agent.escape_room, expected_agent);
-        } else {
-            assert_eq!(new_agent.escape_room, old_agent.escape_room);
-        }
+        let expected = if i == acting_agent_idx { &expected_agent } else { &old_agent.escape_room };
+        assert_eq!(new_agent.escape_room.room_idx, expected.room_idx);
+        assert_eq!(new_agent.escape_room.x, expected.x);
+        assert_eq!(new_agent.escape_room.y, expected.y);
+        assert_eq!(new_agent.escape_room.finished, expected.finished);
     }
     if let Some(message) = &input.send_message {
         check_send_escaperoom_message(old_state, new_state, message);

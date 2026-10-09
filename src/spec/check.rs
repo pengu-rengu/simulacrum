@@ -52,13 +52,30 @@ fn mock_states() -> Vec<State> {
             finished: false
         }
     };
-    let state = |agent_idx: usize, agents: Vec<Agent>| State {
+    let state_in = |agent_idx: usize, agents: Vec<Agent>, rooms: Vec<Room>| State {
         turn: 0,
         agent_idx,
         agents,
         nodes: vec![node.clone()],
-        rooms: vec![room.clone()]
+        rooms
     };
+    let state = |agent_idx: usize, agents: Vec<Agent>| state_in(agent_idx, agents, vec![room.clone()]);
+    let exit_room = Room {
+        name: "Hall".to_string(),
+        width: 2,
+        height: 1,
+        cells: vec![EscapeRoomCell::Empty, EscapeRoomCell::Exit]
+    };
+    let next_room = Room {
+        name: "Next".to_string(),
+        width: 2,
+        height: 1,
+        cells: vec![EscapeRoomCell::Spawn(0), EscapeRoomCell::Spawn(1)]
+    };
+    let exit_agents = vec![
+        agent("Agent0", 0, 0, None, vec![]),
+        agent("Agent1", 0, 0, None, vec![])
+    ];
 
     // check() zips states with inputs, so repeat each state once per input
     let input_count = 15;
@@ -78,7 +95,17 @@ fn mock_states() -> Vec<State> {
         state(1, vec![
             agent("Agent0", 1, 0, None, vec![]),
             agent("Agent1", 2, 1, Some("prior".to_string()), vec![prior_message])
-        ])
+        ]),
+        state_in(0, exit_agents.clone(), vec![exit_room.clone(), next_room]),
+        state_in(0, exit_agents, vec![exit_room]),
+        {
+            let mut winner = agent("Agent0", 1, 0, None, vec![]);
+            winner.escape_room.finished = true;
+            state(0, vec![
+                winner,
+                agent("Agent1", 2, 1, None, vec![])
+            ])
+        }
     ];
     base_states.into_iter()
         .flat_map(|state| std::iter::repeat_n(state, input_count))

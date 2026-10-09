@@ -2,10 +2,17 @@ use crate::state::state::State;
 use crate::state::escaperoom::EscapeRoomCell;
 
 pub fn check_flush_escaperoom_state(old_state: &State, new_state: &State, output: &str) {
-    let mut expected_output = String::new();
-
     let acting_agent_idx = old_state.agent_idx;
     let acting_agent = &old_state.agents[acting_agent_idx].escape_room;
+
+    if acting_agent.finished {
+        assert_eq!(output, "you won!");
+        return;
+    }
+
+    let mut expected_output = String::new();
+
+    
     let room = &old_state.rooms[acting_agent.room_idx];
 
     expected_output += &format!("Room: {}\n\n", room.name);
