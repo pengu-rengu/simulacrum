@@ -1,11 +1,9 @@
 use crate::spec::assumptions::{agents::check_agent, inventory::check_inventory, combat::check_combat};
+use crate::spec::flush::escaperoom::check_flush_escaperoom_state;
 use crate::spec::next::escaperoom::escaperoom::check_escaperoom_next_state;
 use std::collections::HashSet;
 use std::iter::zip;
 use crate::state::state::{Input, State, Universe};
-use crate::state::nodeworld::{Menu, NodeworldAction};
-use crate::state::escaperoom::{EscapeRoomInput};
-use crate::spec::common::{check_body_grids_unchanged, check_encounters_unchanged, check_error_and_nodeworld_unchanged, check_nodes_unchanged};
 use serde_json::from_str;
 
 pub fn check_error_and_unchanged(old_state: &State, new_state: &State, error_msg: &str) {
@@ -80,5 +78,9 @@ pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
 }
 
 pub fn check_flush_state(old_state: &State, new_state: &State, output: &str) {
-    
+    let acting_agent = &old_state.agents[old_state.agent_idx];
+
+    if acting_agent.universe == Universe::EscapeRoom {
+        check_flush_escaperoom_state(old_state, new_state, output);
+    }
 }
