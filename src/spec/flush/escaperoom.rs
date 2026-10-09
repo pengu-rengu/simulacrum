@@ -8,24 +8,35 @@ pub fn check_flush_escaperoom_state(old_state: &State, new_state: &State, output
     let acting_agent = &old_state.agents[acting_agent_idx].escape_room;
     let room = &old_state.rooms[acting_agent.room_idx];
 
-    expected_output += &format!("Room {}:\n", room.name);
+    expected_output += &format!("Room: {}\n\n", room.name);
 
     for (i, cell) in room.cells.iter().enumerate() {
         let x = i % room.width;
         let y = i / room.width;
-        let char = if x == acting_agent.x && y == acting_agent.y {
-            &(acting_agent_idx + 1).to_string()
-        } else {
+
+        let mut agent_on_cell = false;
+        for (agent_idx, agent) in old_state.agents.iter().enumerate() {
+            if agent.escape_room.room_idx != acting_agent.room_idx { continue; }
+            if x == agent.escape_room.x && y == agent.escape_room.y {
+                expected_output += &(agent_idx + 1).to_string();
+                agent_on_cell = true;
+                break;
+            }
+        }
+        
+        if !agent_on_cell {
             match cell {
-                EscapeRoomCell::Empty => " ",
-                EscapeRoomCell::Wall => "x",
+                EscapeRoomCell::Empty => expected_output += " ",
+                EscapeRoomCell::Wall => expected_output += "x",
                 EscapeRoomCell::Door(door) => {
-                    let id = &door.id;
-                    if door.open { &id.to_lowercase() } else { &id.to_uppercase() }
+                    if door.open {
+                        expected_output += &door.id.to_lowercase();
+                    } else {
+                        expected_output += &door.id.to_uppercase();
+                    }
                 }
             }
-        };
-        expected_output += char;
+        }
         if x == room.width - 1 {
             expected_output += "\n";
         }

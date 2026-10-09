@@ -1,11 +1,58 @@
-use crate::state::escaperoom::{EscapeRoomAction, EscapeRoomCell};
-use crate::state::state::{State, Input, NodeworldAction, Message, Item, ItemStack, PointOfInterest, DepositType, Menu, CombatEncounter, ToolAttribute, Direction};
+use crate::state::escaperoom::{EscapeRoomAction, EscapeRoomCell, Room};
+use crate::state::state::{State, Input, NodeworldAction, Message, Item, ItemStack, PointOfInterest, DepositType, Menu, CombatEncounter, ToolAttribute, Direction, Universe};
 use serde_json::from_str;
 
 pub fn flush_state(state: &State) -> (State, String) {
     let mut new_state = state.clone();
     let agent_idx = new_state.agent_idx;
     let agent = &state.agents[agent_idx];
+
+    if agent.universe == Universe::EscapeRoom {
+        let escape_room = &agent.escape_room;
+        let room = &state.rooms[escape_room.room_idx];
+        let mut output = format!("Room: {}\n\n", room.name);
+        for (i, cell) in room.cells.iter().enumerate() {
+            let x = i % room.width;
+            let y = i / room.width;
+            let mut agent_on_cell = false;
+            for (other_idx, other) in state.agents.iter().enumerate() {
+                if other.escape_room.room_idx != escape_room.room_idx { continue; }
+                if x == other.escape_room.x && y == other.escape_room.y {
+                    output += &(other_idx + 1).to_string();
+                    agent_on_cell = true;
+                    break;
+                }
+            }
+            if !agent_on_cell {
+                match cell {
+                    EscapeRoomCell::Empty => output += " ",
+                    EscapeRoomCell::Wall => output += "x",
+                    EscapeRoomCell::Door(door) => {
+                        if door.open {
+                            output += &door.id.to_lowercase();
+                        } else {
+                            output += &door.id.to_uppercase();
+                        }
+                    }
+                }
+            }
+            if x == room.width - 1 {
+                output += "\n";
+            }
+        }
+        if let Some(error_message) = &agent.error_message {
+            output += &format!("Error: {}\n", error_message);
+        }
+        new_state.agents[agent_idx].error_message = None;
+        if !escape_room.messages_inbox.is_empty() {
+            output += "Messages:\n";
+            for message in &escape_room.messages_inbox {
+                output += &format!("[{}] {}\n", state.agents[message.sender_agent_idx].name, message.content);
+            }
+        }
+        new_state.agents[agent_idx].escape_room.messages_inbox.clear();
+        return (new_state, output);
+    }
 
     // the spec cannot be imported from here, so only the label formatting is restated
     let item_label = |item: &Item| match item {
@@ -127,69 +174,81 @@ pub fn next_state(state: &State, input_str: &str) -> State {
         Err(_) => {
             new_state.agents[curr_agent_idx].error_message = Some("could not parse input json".to_string());
         }
-        Ok(Input::EscapeRoomInput(input)) => {
-            new_state.agents[curr_agent_idx].error_message = None;
-            let room_idx = curr_agent.escape_room.room_idx;
-            let mut x = curr_agent.escape_room.x;
-            let mut y = curr_agent.escape_room.y;
-
-            if room_idx < new_state.rooms.len() {
-                for action in &input.actions {
-                    let next = match action {
-                        EscapeRoomAction::Move { direction } | EscapeRoomAction::Interact { direction } => match direction {
-                            Direction::Up => y.checked_sub(1).map(|next_y| (x, next_y)),
-                            Direction::Down => y.checked_add(1).map(|next_y| (x, next_y)),
-                            Direction::Left => x.checked_sub(1).map(|next_x| (next_x, y)),
-                            Direction::Right => x.checked_add(1).map(|next_x| (next_x, y))
+        Ok(input) => match curr_agent.universe {
+            Universe::EscapeRoom => match input {
+                Input::NodeworldInput(_) => {
+                    new_state.agents[curr_agent_idx].error_message = Some("expected EscapeRoomInput".to_string());
+                }
+                Input::EscapeRoomInput(input) => {
+                    new_state.agents[curr_agent_idx].error_message = None;
+                    let room_idx = curr_agent.escape_room.room_idx;
+                    let mut x = curr_agent.escape_room.x;
+                    let mut y = curr_agent.escape_room.y;
+                    let step = |x: usize, y: usize, direction: &Direction, room: &Room| {
+                        let (next_x, next_y) = match direction {
+                            Direction::Up => (x, y.saturating_sub(1)),
+                            Direction::Down => (x, y + 1),
+                            Direction::Left => (x.saturating_sub(1), y),
+                            Direction::Right => (x + 1, y)
+                        };
+                        if next_x >= room.width || next_y >= room.height {
+                            (x, y)
+                        } else {
+                            (next_x, next_y)
                         }
                     };
-                    let Some((next_x, next_y)) = next else { continue };
-                    match action {
-                        EscapeRoomAction::Move { .. } => {
-                            let room = &new_state.rooms[room_idx];
-                            if next_x >= room.width || next_y >= room.height { continue; }
-                            let Some(cell) = room.cells.get(next_y * room.width + next_x) else { continue };
-                            let can_enter = match cell {
-                                EscapeRoomCell::Empty => true,
-                                EscapeRoomCell::Door(door) => door.open,
-                                EscapeRoomCell::Wall => false
-                            };
-                            if can_enter {
-                                x = next_x;
-                                y = next_y;
-                            }
-                        }
-                        EscapeRoomAction::Interact { .. } => {
-                            let id = {
+
+                    for action in &input.actions {
+                        match action {
+                            EscapeRoomAction::Move { direction } => {
                                 let room = &new_state.rooms[room_idx];
-                                if next_x >= room.width || next_y >= room.height { continue; }
-                                let Some(EscapeRoomCell::Door(door)) = room.cells.get(next_y * room.width + next_x) else { continue };
-                                door.id.clone()
-                            };
-                            for cell in &mut new_state.rooms[room_idx].cells {
-                                if let EscapeRoomCell::Door(door) = cell {
-                                    if door.id == id {
-                                        door.open = !door.open;
+                                let (next_x, next_y) = step(x, y, direction, room);
+                                let cell = &room.cells[next_y * room.width + next_x];
+                                let can_enter = match cell {
+                                    EscapeRoomCell::Empty => true,
+                                    EscapeRoomCell::Door(door) => door.open,
+                                    EscapeRoomCell::Wall => false
+                                };
+                                if can_enter {
+                                    x = next_x;
+                                    y = next_y;
+                                }
+                            }
+                            EscapeRoomAction::Interact { direction } => {
+                                let door_id = {
+                                    let room = &new_state.rooms[room_idx];
+                                    let (next_x, next_y) = step(x, y, direction, room);
+                                    let EscapeRoomCell::Door(door) = &room.cells[next_y * room.width + next_x] else { continue };
+                                    door.id.clone()
+                                };
+                                for cell in &mut new_state.rooms[room_idx].cells {
+                                    if let EscapeRoomCell::Door(door) = cell {
+                                        if door.id == door_id {
+                                            door.open = !door.open;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-            }
-            new_state.agents[curr_agent_idx].escape_room.x = x;
-            new_state.agents[curr_agent_idx].escape_room.y = y;
+                    new_state.agents[curr_agent_idx].escape_room.x = x;
+                    new_state.agents[curr_agent_idx].escape_room.y = y;
 
-            if let Some(content) = input.send_message {
-                for agent in &mut new_state.agents {
-                    agent.escape_room.messages_inbox.push(Message {
-                        sender_agent_idx: curr_agent_idx,
-                        content: content.clone()
-                    });
+                    if let Some(content) = input.send_message {
+                        for agent in &mut new_state.agents {
+                            agent.escape_room.messages_inbox.push(Message {
+                                sender_agent_idx: curr_agent_idx,
+                                content: content.clone()
+                            });
+                        }
+                    }
                 }
             }
-        }
-        Ok(Input::NodeworldInput(input)) => {
+            Universe::Nodeworld => match input {
+                Input::EscapeRoomInput(_) => {
+                    new_state.agents[curr_agent_idx].error_message = Some("expected NodeworldInput".to_string());
+                }
+                Input::NodeworldInput(input) => {
             // each action either succeeds or fails with nothing about the agent changed
             // an agent fights in at most one encounter, wherever it is
             let in_combat = state.nodes.iter()
@@ -392,7 +451,9 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                     });
                 }
             }
+            }
         }
+    }
     }
 
     new_state.agent_idx += 1;

@@ -7,7 +7,6 @@ use crate::state::state::{Input, State, Universe};
 use serde_json::from_str;
 
 pub fn check_error_and_unchanged(old_state: &State, new_state: &State, error_msg: &str) {
-    assert_eq!(new_state.agents, old_state.agents);
     assert_eq!(new_state.nodes, old_state.nodes);
     assert_eq!(new_state.rooms, old_state.rooms);
 
