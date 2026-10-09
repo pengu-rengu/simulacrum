@@ -1,4 +1,4 @@
-const ROOMA1: &str = "
+pub const ROOM1: &str = "
 xxxxxxxxxx
 x1x2x3x4xx
 x x xAxD x
