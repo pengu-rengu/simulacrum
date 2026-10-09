@@ -17,10 +17,10 @@ pub fn check_move_to(old_state: &State, new_state: &State, node_name: &str) {
     for (i,(old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
         if i == acting_agent_idx {
             assert_eq!(new_agent.nodeworld.node_idx, target_node_idx);
-            assert_eq!(new_agent.nodeworld.error_message, None);
+            assert_eq!(new_agent.error_message, None);
         } else {
             assert_eq!(new_agent.nodeworld.node_idx, old_agent.nodeworld.node_idx);
-            assert_eq!(new_agent.nodeworld.error_message, old_agent.nodeworld.error_message);
+            assert_eq!(new_agent.error_message, old_agent.error_message);
         }
 
         assert_eq!(new_agent.nodeworld.open_menu, old_agent.nodeworld.open_menu);
@@ -52,26 +52,5 @@ pub fn check_send_nodeworld_message(old_state: &State, new_state: &State, conten
 pub fn check_nodeworld_messages_unchanged(old_state: &State, new_state: &State) {
     for (old_agent, new_agent) in zip(&old_state.agents, &new_state.agents) {
         assert_eq!(new_agent.nodeworld.node_messages_inbox, old_agent.nodeworld.node_messages_inbox);
-    }
-}
-
-pub fn check_send_escaperoom_message(old_state: &State, new_state: &State, content: &str) {
-    for (old_agent, new_agent) in zip(&old_state.agents, &new_state.agents) {
-        if let Some((last, rest)) = new_agent.escape_room.messages_inbox.split_last() {
-            let new_message = Message {
-                sender_agent_idx: old_state.agent_idx,
-                content: content.to_string()
-            };
-            assert_eq!(*last, new_message);
-            assert_eq!(rest, old_agent.escape_room.messages_inbox);
-        } else {
-            panic!("new messages cannot be empty")
-        }
-    }
-}
-
-pub fn check_escaperoom_message_unchanged(old_state: &State, new_state: &State) {
-    for (old_agent, new_agent) in zip(&old_state.agents, &new_state.agents) {
-        assert_eq!(new_agent.escape_room.messages_inbox, old_agent.escape_room.messages_inbox);
     }
 }

@@ -107,7 +107,7 @@ pub fn flush_state(state: &State) -> (State, String) {
         lines.push(format!("[{}] {}", state.agents[message.sender_agent_idx].name, message.content));
     }
 
-    if let Some(error_message) = &agent.nodeworld.error_message {
+    if let Some(error_message) = &agent.error_message {
         lines.push("".to_string());
         lines.push(format!("Error: {}", error_message));
     }
@@ -125,10 +125,10 @@ pub fn next_state(state: &State, input_str: &str) -> State {
 
     match from_str::<Input>(input_str) {
         Err(_) => {
-            new_state.agents[curr_agent_idx].nodeworld.error_message = Some("could not parse input json".to_string());
+            new_state.agents[curr_agent_idx].error_message = Some("could not parse input json".to_string());
         }
         Ok(Input::EscapeRoomInput(input)) => {
-            new_state.agents[curr_agent_idx].nodeworld.error_message = None;
+            new_state.agents[curr_agent_idx].error_message = None;
             let room_idx = curr_agent.escape_room.room_idx;
             let mut x = curr_agent.escape_room.x;
             let mut y = curr_agent.escape_room.y;
@@ -380,7 +380,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                 }
                 None => Ok(())
             };
-            new_state.agents[curr_agent_idx].nodeworld.error_message = result.err();
+            new_state.agents[curr_agent_idx].error_message = result.err();
 
             if let Some(content) = input.send_message {
                 // the message reaches whoever shared the node at the start of the turn

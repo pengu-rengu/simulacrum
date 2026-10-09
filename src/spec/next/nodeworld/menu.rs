@@ -18,7 +18,7 @@ pub fn check_inspect(old_state: &State, new_state: &State, poi_idx: usize) {
         None => check_error_and_unchanged(old_state, new_state, &format!("no poi at index {poi_idx}")),
         Some(PointOfInterest::Inspectable { name: _, menu }) => {
             assert_eq!(new_state.agents[acting_agent_idx].nodeworld.open_menu, Some(menu.clone()));
-            assert_eq!(new_state.agents[acting_agent_idx].nodeworld.error_message, None);
+            assert_eq!(new_state.agents[acting_agent_idx].error_message, None);
             assert_eq!(new_state.agents[acting_agent_idx].nodeworld.inventory, old_state.agents[acting_agent_idx].nodeworld.inventory);
         }
         Some(_) => check_error_and_unchanged(old_state, new_state, "nothing to inspect here"),
@@ -68,10 +68,10 @@ pub fn check_craft(old_state: &State, new_state: &State, recipe_idx: usize) {
     for (i, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
         if i == acting_agent_idx {
             assert_eq!(new_agent.nodeworld.inventory, expected_inventory);
-            assert_eq!(new_agent.nodeworld.error_message, None);
+            assert_eq!(new_agent.error_message, None);
         } else {
             assert_eq!(new_agent.nodeworld.inventory, old_agent.nodeworld.inventory);
-            assert_eq!(new_agent.nodeworld.error_message, old_agent.nodeworld.error_message);
+            assert_eq!(new_agent.error_message, old_agent.error_message);
         }
         assert_eq!(new_agent.nodeworld.open_menu, old_agent.nodeworld.open_menu);
         assert_eq!(new_agent.nodeworld.node_idx, old_agent.nodeworld.node_idx);
@@ -90,10 +90,10 @@ pub fn check_exit(old_state: &State, new_state: &State) {
     for (i, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
         if i == acting_agent_idx {
             assert_eq!(new_agent.nodeworld.open_menu, None);
-            assert_eq!(new_agent.nodeworld.error_message, None);
+            assert_eq!(new_agent.error_message, None);
         } else {
             assert_eq!(new_agent.nodeworld.open_menu, old_agent.nodeworld.open_menu);
-            assert_eq!(new_agent.nodeworld.error_message, old_agent.nodeworld.error_message);
+            assert_eq!(new_agent.error_message, old_agent.error_message);
         }
         assert_eq!(new_agent.nodeworld.inventory, old_agent.nodeworld.inventory);
         assert_eq!(new_agent.nodeworld.node_idx, old_agent.nodeworld.node_idx);

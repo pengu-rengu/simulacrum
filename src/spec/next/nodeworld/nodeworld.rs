@@ -2,7 +2,7 @@ use std::iter::zip;
 
 use crate::{
     spec::{
-        common::{check_body_grids_unchanged, check_encounters_unchanged, check_nodes_unchanged}, next::{nodeworld::{combat::check_engage, harvest::check_harvest, menu::{check_craft, check_exit, check_inspect}}, turn::{ check_escaperoom_message_unchanged, check_nodeworld_messages_unchanged, check_move_to, check_send_nodeworld_message}}}, state::state::{NodeworldAction, NodeworldInput, State}
+        common::{check_body_grids_unchanged, check_encounters_unchanged, check_nodes_unchanged}, next::nodeworld::{combat::check_engage, harvest::check_harvest, menu::{check_craft, check_exit, check_inspect}, turn::{check_send_nodeworld_message, check_nodeworld_messages_unchanged, check_move_to}}}, state::state::{NodeworldAction, NodeworldInput, State}
     };
 
 
@@ -15,7 +15,6 @@ pub fn check_nodeworld_next_state(old_state: &State, new_state: &State, input: &
     } else {
         check_nodeworld_messages_unchanged(old_state, new_state);
     }
-    check_escaperoom_message_unchanged(old_state, new_state);
 
     if !matches!(input.action, Some(NodeworldAction::Engage { .. })) {
         check_encounters_unchanged(old_state, new_state);
@@ -31,7 +30,7 @@ pub fn check_nodeworld_next_state(old_state: &State, new_state: &State, input: &
         None => {
             for (i, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
                 if i != old_state.agent_idx {
-                    assert_eq!(new_agent.nodeworld.error_message, old_agent.nodeworld.error_message)
+                    assert_eq!(new_agent.error_message, old_agent.error_message)
                 }
                 assert_eq!(new_agent.nodeworld.body_grid, old_agent.nodeworld.body_grid);
                 assert_eq!(new_agent.nodeworld.open_menu, old_agent.nodeworld.open_menu);

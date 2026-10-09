@@ -1,4 +1,4 @@
-use crate::state::state::{ToolAttribute, BodyCell, BodyGrid, DepositType, Enemy, Item, ItemStack, Menu, Node, PointOfInterest, Recipe, State};
+use crate::state::state::{BodyCell, BodyGrid, DepositType, Enemy, Item, ItemStack, Menu, Node, PointOfInterest, Recipe, State, ToolAttribute, Universe};
 use crate::state::escaperoom::{DoorCell, EscapeRoomCell, Room};
 use crate::state::agent::{Agent, EscapeRoomAgent, NodeworldAgent};
 
@@ -10,7 +10,6 @@ fn initial_body_grid() -> BodyGrid {
     }
 }
 
-/// Core cells in a plus shape.
 fn amber_husk() -> Enemy {
     let core = || BodyCell::CoreCell { health: 5 };
     Enemy {
@@ -63,10 +62,11 @@ impl State {
             agents: vec![
                 Agent {
                     name: "Agent1".to_string(),
+                    universe: Universe::Nodeworld,
+                    error_message: None,
                     nodeworld: NodeworldAgent {
                         node_idx: 0,
                         node_messages_inbox: vec![],
-                        error_message: None,
                         body_grid: initial_body_grid(),
                         inventory: vec![],
                         open_menu: None
@@ -80,10 +80,11 @@ impl State {
                 },
                 Agent {
                     name: "Agent2".to_string(),
+                    universe: Universe::Nodeworld,
+                    error_message: None,
                     nodeworld: NodeworldAgent {
                         node_idx: 0,
                         node_messages_inbox: vec![],
-                        error_message: None,
                         body_grid: initial_body_grid(),
                         inventory: vec![],
                         open_menu: None

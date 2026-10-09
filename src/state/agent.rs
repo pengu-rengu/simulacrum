@@ -1,19 +1,20 @@
 use serde::{Serialize, Deserialize};
-use crate::state::state::{Message, BodyGrid, ItemStack, Menu};
+use crate::state::state::{BodyGrid, ItemStack, Menu, Message, Universe};
 
 #[derive(Serialize, Deserialize, Clone)]
 
 pub struct Agent {
     pub name: String,
+    pub error_message: Option<String>,
+    pub universe: Universe,
     pub nodeworld: NodeworldAgent,
     pub escape_room: EscapeRoomAgent
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct NodeworldAgent {
     pub node_idx: usize,
     pub node_messages_inbox: Vec<Message>,
-    pub error_message: Option<String>,
     pub body_grid: BodyGrid,
     pub inventory: Vec<ItemStack>,
     pub open_menu: Option<Menu>

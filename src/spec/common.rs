@@ -71,7 +71,7 @@ pub fn check_error_and_unchanged(old_state: &State, new_state: &State, expected:
     let acting_agent_idx = old_state.agent_idx;
     let old_agent = &old_state.agents[acting_agent_idx];
     let new_agent = &new_state.agents[acting_agent_idx];
-    assert_eq!(new_agent.nodeworld.error_message, Some(expected.to_string()));
+    assert_eq!(new_agent.error_message, Some(expected.to_string()));
     assert_eq!(new_agent.nodeworld.open_menu, old_agent.nodeworld.open_menu);
     assert_eq!(new_agent.nodeworld.node_idx, old_agent.nodeworld.node_idx);
     assert_eq!(new_agent.nodeworld.inventory, old_agent.nodeworld.inventory);

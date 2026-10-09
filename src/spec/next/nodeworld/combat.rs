@@ -51,9 +51,9 @@ pub fn check_engage(old_state: &State, new_state: &State, poi_idx: usize) {
 
     for (i, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
         if i == acting_agent_idx {
-            assert_eq!(new_agent.nodeworld.error_message, None);
+            assert_eq!(new_agent.error_message, None);
         } else {
-            assert_eq!(new_agent.nodeworld.error_message, old_agent.nodeworld.error_message);
+            assert_eq!(new_agent.error_message, old_agent.error_message);
         }
         assert_eq!(new_agent.nodeworld.inventory, old_agent.nodeworld.inventory);
         assert_eq!(new_agent.nodeworld.open_menu, old_agent.nodeworld.open_menu);

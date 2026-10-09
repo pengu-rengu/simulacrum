@@ -1,5 +1,5 @@
 use crate::spec::spec::{assumptions, check_next_state, check_flush_state};
-use crate::state::state::{State, Node, BodyGrid, BodyCell, Item, ItemStack, PointOfInterest, DepositType, Menu, Recipe, CombatEncounter, Enemy, ToolAttribute};
+use crate::state::state::{BodyCell, BodyGrid, CombatEncounter, DepositType, Enemy, Item, ItemStack, Menu, Node, PointOfInterest, Recipe, State, ToolAttribute, Universe};
 use crate::impl_::next_state::{flush_state, next_state};
 use crate::state::agent::{Agent, EscapeRoomAgent, NodeworldAgent};
 use std::iter::zip;
@@ -87,17 +87,18 @@ fn mock_states() -> Vec<State> {
                     for encounter_kind in 0..4 {
                         let agents = (0..num_agents).map(|a| Agent {
                             name: format!("Agent{a}"),
+                            error_message: if has_error && a == agent_idx {
+                                Some("could not parse input json".to_string())
+                            } else {
+                                None
+                            },
+                            universe: Universe::Nodeworld,
                             nodeworld: NodeworldAgent {
                                 node_idx: (a + shift) % num_nodes,
                                 node_messages_inbox: (0..a % 3).map(|m| crate::state::state::Message {
                                     sender_agent_idx: (a + m) % num_agents,
                                     content: contents[(a + m) % contents.len()].to_string()
                                 }).collect(),
-                                error_message: if has_error && a == agent_idx {
-                                    Some("could not parse input json".to_string())
-                                } else {
-                                    None
-                                },
                                 body_grid: {
                                     let width = 1 + a % 3;
                                     let height = 1 + (a + shift) % 2;

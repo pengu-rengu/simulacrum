@@ -29,9 +29,6 @@ struct DepositState {
 }
 
 impl DepositState {
-    /// One swing: the tool's attributes apply in order, bare hands chip 1.
-    /// Chipping moves exposed into yield, drilling moves reserves into exposed,
-    /// and every unit moved costs 1 stability. A swing that moves nothing still wears the tool.
     fn update(&mut self, tool: Option<&Item>) {
         let attributes = match tool {
             None => vec![(ToolAttribute::Chipping, 1)],
@@ -147,13 +144,13 @@ pub fn check_harvest(old_state: &State, new_state: &State, poi_idx: usize, tool_
         if i == acting_agent_idx {
             assert_eq!(new_agent.nodeworld.inventory, expected_inventory);
             if collapsed {
-                assert_eq!(new_agent.nodeworld.error_message, Some(format!("deposit collapsed")));
+                assert_eq!(new_agent.error_message, Some(format!("deposit collapsed")));
             } else {
-                assert_eq!(new_agent.nodeworld.error_message, None);
+                assert_eq!(new_agent.error_message, None);
             }
         } else {
             assert_eq!(new_agent.nodeworld.inventory, old_agent.nodeworld.inventory);
-            assert_eq!(new_agent.nodeworld.error_message, old_agent.nodeworld.error_message);
+            assert_eq!(new_agent.error_message, old_agent.error_message);
         }
         assert_eq!(new_agent.nodeworld.open_menu, old_agent.nodeworld.open_menu);
         assert_eq!(new_agent.nodeworld.node_idx, old_agent.nodeworld.node_idx);

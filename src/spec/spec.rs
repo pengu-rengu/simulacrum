@@ -2,7 +2,7 @@ use crate::spec::assumptions::{agents::check_agent, inventory::check_inventory, 
 use crate::spec::next::escaperoom::escaperoom::check_escaperoom_next_state;
 use crate::spec::next::nodeworld::nodeworld::check_nodeworld_next_state;
 use std::collections::HashSet;
-use crate::state::state::{State, Input, NodeworldAction, Menu};
+use crate::state::state::{Input, Menu, NodeworldAction, State, Universe};
 use crate::spec::common::{check_body_grids_unchanged, check_encounters_unchanged, check_error_and_unchanged, check_nodes_unchanged};
 use crate::spec::flush::{
     sections::{error_lines, inventory_lines, message_lines},
@@ -48,12 +48,20 @@ pub fn check_next_state(old_state: &State, new_state: &State, input_str: &str) {
         return;
     };
 
-    match input {
-        Input::NodeworldInput(nodeworld_input) => {
-            check_nodeworld_next_state(old_state, new_state, &nodeworld_input);
+    match &old_state.agents[old_state.agent_idx].universe {
+        Universe::Nodeworld => {
+            if let Input::NodeworldInput(nodeworld_input) = &input {
+                check_nodeworld_next_state(old_state, new_state, &nodeworld_input);
+            } else {
+                check_error_and_unchanged(old_state, new_state, "expected NodeworldInput");
+            }
         }
-        Input::EscapeRoomInput(escaperoom_input) => {
-            check_escaperoom_next_state(old_state, new_state, &escaperoom_input);
+        Universe::EscapeRoom => {
+            if let Input::EscapeRoomInput(escaperoom_input) = &input {
+                check_escaperoom_next_state(old_state, new_state, &escaperoom_input);
+            } else {
+                check_error_and_unchanged(old_state, new_state, "expected EscapeRoomInput");
+            }
         }
     }
 }
@@ -74,7 +82,7 @@ pub fn check_flush_state(old_state: &State, new_state: &State, output: &str) {
     };
     lines.extend(inventory_lines(agent));
     lines.extend(message_lines(old_state, agent));
-    lines.extend(error_lines(&new_state.agents[agent_idx].nodeworld.error_message));
+    lines.extend(error_lines(&new_state.agents[agent_idx].error_message));
 
     assert_eq!(output, lines.join("\n"));
     assert!(new_state.agents[agent_idx].nodeworld.node_messages_inbox.is_empty());
