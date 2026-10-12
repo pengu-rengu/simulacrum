@@ -55,6 +55,14 @@ fn main() -> Result<(), std::io::Error> {
     }
 
     loop {
+        if state.agents.iter().all(|agent| agent.escape_room.finished) {
+            for agent in &state.agents {
+                write_log(&agent.name, "you won!")?;
+                write(agent_file_path(&agent.name), "you won!")?;
+            }
+            return Ok(());
+        }
+
         let (flushed_state, output) = flush_state(&state);
 
         let agent_name = &flushed_state.agents[flushed_state.agent_idx].name;
@@ -63,16 +71,23 @@ fn main() -> Result<(), std::io::Error> {
         let path = agent_file_path(agent_name);
         write(&path, &output)?;
 
-        let one_second = Duration::from_secs(1);
-        let input = loop {
-            sleep(one_second);
-            let file_contents = read_to_string(&path)?;
-            if file_contents != output {
-                break file_contents;
+        let finished = flushed_state.agents[flushed_state.agent_idx].escape_room.finished;
+        let input = if finished {
+            "{\"EscapeRoomInput\":{\"actions\":[],\"send_message\":null}}".to_string()
+        } else {
+            let one_second = Duration::from_secs(1);
+            loop {
+                sleep(one_second);
+                let file_contents = read_to_string(&path)?;
+                if file_contents != output {
+                    break file_contents;
+                }
             }
         };
 
-        write_log(agent_name, &input)?;
+        if !finished {
+            write_log(agent_name, &input)?;
+        }
 
         state = next_state(&flushed_state, &input);
     }
