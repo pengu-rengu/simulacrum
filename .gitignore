@@ -1,4 +1,5 @@
 /target
 /agents
+/agent_logs
 .DS_Store
 .cursor

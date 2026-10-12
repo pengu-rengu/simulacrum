@@ -2,13 +2,12 @@ use serde::{Serialize, Deserialize};
 use crate::state::escaperoom::{EscapeRoomAgent, EscapeRoomInput, Room};
 use crate::state::nodeworld::{NodeworldAgent, NodeworldInput};
 pub use crate::state::escaperoom::Direction;
-pub use crate::state::nodeworld::{BodyCell, BodyGrid, CombatEncounter, DepositType, Enemy, Item, ItemStack, Menu, Node, NodeworldAction, PointOfInterest, Recipe, ToolAttribute};
+pub use crate::state::nodeworld::{BodyCell, BodyGrid, CombatEncounter, DepositType, Item, ItemStack, Menu, Node, NodeworldAction, PointOfInterest, ToolAttribute};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum Universe {
     Nodeworld, EscapeRoom
 }
-
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct State {
@@ -18,7 +17,6 @@ pub struct State {
     pub nodes: Vec<Node>,
     pub rooms: Vec<Room>
 }
-
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 
