@@ -37,7 +37,7 @@ pub fn flush_state(state: &State) -> (State, String) {
                             output += &door.id.to_uppercase();
                         }
                     }
-                    EscapeRoomCell::Exit => output += "E"
+                    EscapeRoomCell::Exit(_) => output += "E"
                 }
             }
             if x == room.width - 1 {
@@ -211,9 +211,9 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                                 let (next_x, next_y) = step(x, y, direction, room);
                                 let cell = &room.cells[next_y * room.width + next_x];
                                 let can_enter = match cell {
-                                    EscapeRoomCell::Empty | EscapeRoomCell::Spawn(_) => true,
+                                    EscapeRoomCell::Empty | EscapeRoomCell::Spawn(_) | EscapeRoomCell::Exit(_) => true,
                                     EscapeRoomCell::Door(door) => door.open,
-                                    EscapeRoomCell::Wall | EscapeRoomCell::Exit => false
+                                    EscapeRoomCell::Wall => false
                                 };
                                 if can_enter {
                                     x = next_x;
@@ -237,23 +237,25 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                                             }
                                         }
                                     }
-                                    EscapeRoomCell::Exit => {
+                                    EscapeRoomCell::Exit(agent_idxs) if agent_idxs.len() == new_state.agents.len() => {
                                         if new_state.rooms.get(room_idx + 1).is_some() {
                                             let next_room = new_state.rooms[room_idx + 1].clone();
                                             room_idx += 1;
                                             let mut found_spawn = false;
                                             for (i, cell) in next_room.cells.iter().enumerate() {
-                                                if let EscapeRoomCell::Spawn(spawn_agent_idx) = cell
-                                                && *spawn_agent_idx == curr_agent_idx {
-                                                    x = i % next_room.width;
-                                                    y = i / next_room.width;
-                                                    found_spawn = true;
+                                                if let EscapeRoomCell::Spawn(idx) = cell && *idx == curr_agent_idx {
+                                                    (x, y, found_spawn) = (i % next_room.width, i / next_room.width, true);
                                                     break;
                                                 }
                                             }
                                             if !found_spawn { panic!("spawn not found"); }
                                         } else {
                                             finished = true;
+                                        }
+                                    }
+                                    EscapeRoomCell::Exit(_) => {
+                                        for cell in &mut new_state.rooms[room_idx].cells {
+                                            if let EscapeRoomCell::Exit(set) = cell { set.insert(curr_agent_idx); }
                                         }
                                     }
                                     _ => {}

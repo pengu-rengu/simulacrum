@@ -64,7 +64,16 @@ fn mock_states() -> Vec<State> {
         name: "Hall".to_string(),
         width: 2,
         height: 1,
-        cells: vec![EscapeRoomCell::Empty, EscapeRoomCell::Exit]
+        cells: vec![EscapeRoomCell::Empty, EscapeRoomCell::Exit(std::collections::HashSet::new())]
+    };
+    let mut signed = std::collections::HashSet::new();
+    signed.insert(0);
+    signed.insert(1);
+    let ready_exit = Room {
+        name: "Hall".to_string(),
+        width: 2,
+        height: 1,
+        cells: vec![EscapeRoomCell::Empty, EscapeRoomCell::Exit(signed)]
     };
     let next_room = Room {
         name: "Next".to_string(),
@@ -96,8 +105,10 @@ fn mock_states() -> Vec<State> {
             agent("Agent0", 1, 0, None, vec![]),
             agent("Agent1", 2, 1, Some("prior".to_string()), vec![prior_message])
         ]),
-        state_in(0, exit_agents.clone(), vec![exit_room.clone(), next_room]),
-        state_in(0, exit_agents, vec![exit_room]),
+        state_in(0, exit_agents.clone(), vec![exit_room.clone(), next_room.clone()]),
+        state_in(0, exit_agents.clone(), vec![exit_room]),
+        state_in(0, exit_agents.clone(), vec![ready_exit.clone(), next_room]),
+        state_in(0, exit_agents, vec![ready_exit]),
         {
             let mut winner = agent("Agent0", 1, 0, None, vec![]);
             winner.escape_room.finished = true;

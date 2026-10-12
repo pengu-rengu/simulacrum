@@ -42,7 +42,7 @@ pub fn check_flush_escaperoom_state(old_state: &State, new_state: &State, output
                         expected_output += &door.id.to_uppercase();
                     }
                 },
-                EscapeRoomCell::Exit => expected_output += "E"
+                EscapeRoomCell::Exit(_) => expected_output += "E"
             }
         }
         if x == room.width - 1 {

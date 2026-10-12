@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use serde::{Serialize, Deserialize};
 use crate::state::state::Message;
 
@@ -9,7 +11,7 @@ pub struct DoorCell {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum EscapeRoomCell {
-    Empty, Wall, Door(DoorCell), Exit, Spawn(usize)
+    Empty, Wall, Door(DoorCell), Exit(HashSet<usize>), Spawn(usize)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -40,7 +42,6 @@ pub struct EscapeRoomAgent {
     pub messages_inbox: Vec<Message>,
     pub finished: bool
 }
-
 
 #[derive(Deserialize)]
 pub enum Direction { Up, Down, Left, Right }

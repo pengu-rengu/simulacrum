@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::state::initial::nodes::initial_nodes;
 use crate::state::nodeworld::{BodyCell, BodyGrid};
 use crate::state::state::{State, Universe};
@@ -30,7 +32,7 @@ fn room_from_str(name: &str, s: &str) -> Room {
                     id: char.to_uppercase().to_string(),
                     open: char.is_lowercase()
                 }),
-                'E' => EscapeRoomCell::Exit,
+                'E' => EscapeRoomCell::Exit(HashSet::new()),
                 '1' | '2' | '3' | '4' => EscapeRoomCell::Spawn(char.to_digit(10).unwrap() as usize - 1),
                 _ => EscapeRoomCell::Empty
             });
@@ -74,6 +76,8 @@ impl State {
             agents: vec![
                 initial_agent("Agent1", 1, 1),
                 initial_agent("Agent2", 3, 1),
+                initial_agent("Agent3", 5, 1),
+                initial_agent("Agent4", 7, 1)
             ],
             nodes: initial_nodes(),
             rooms: vec![

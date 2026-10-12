@@ -25,61 +25,76 @@ fn passable(cell: &EscapeRoomCell) -> bool {
         EscapeRoomCell::Empty => true,
         EscapeRoomCell::Door(door) => door.open,
         EscapeRoomCell::Wall => false,
-        EscapeRoomCell::Exit => false,
+        EscapeRoomCell::Exit(_) => true,
         EscapeRoomCell::Spawn(_) => true
     }
 }
 
-fn escaperoom_move(agent: &mut EscapeRoomAgent, rooms: &[Room], direction: &Direction) {
+fn escaperoom_move(agent: &EscapeRoomAgent, rooms: &[Room], direction: &Direction) -> EscapeRoomAgent {
     let room = &rooms[agent.room_idx];
     let (next_x, next_y) = step(agent.x, agent.y, direction, room);
     let cell = &room.cells[next_y * room.width + next_x];
+
+    let mut expected_agent = agent.clone();
     if passable(&cell) {
-        agent.x = next_x;
-        agent.y = next_y;
+        expected_agent.x = next_x;
+        expected_agent.y = next_y;
     }
+    expected_agent
 }
 
-fn escaperoom_interact(agent: &mut EscapeRoomAgent, acting_agent_idx: usize, rooms: &mut [Room], direction: &Direction) {
+fn escaperoom_interact(agent: &EscapeRoomAgent, rooms: &[Room], acting_agent_idx: usize, n_agents: usize, direction: &Direction) -> (EscapeRoomAgent, Vec<Room>) {
+    let mut expected_agent = agent.clone();
+    let mut expected_rooms = rooms.to_vec();
     let room_idx = agent.room_idx;
-    let faced = {
-        let room = &rooms[room_idx];
-        let (next_x, next_y) = step(agent.x, agent.y, direction, room);
-        room.cells[next_y * room.width + next_x].clone()
-    };
+    let room = &rooms[room_idx];
+    let expected_room = &mut expected_rooms[room_idx];
+    let (next_x, next_y) = step(agent.x, agent.y, direction, room);
+    
 
-    match faced {
+    match &room.cells[next_y * room.width + next_x] {
         EscapeRoomCell::Door(door) => {
-            let door_id = door.id;
-            for cell in &mut rooms[room_idx].cells {
+            let door_id = &door.id;
+            for cell in &mut expected_room.cells {
                 if let EscapeRoomCell::Door(door) = cell {
-                    if door.id == door_id {
+                    if door.id == door_id.clone() {
                         door.open = !door.open;
                     }
                 }
             }
         }
-        EscapeRoomCell::Exit => {
-            if rooms.get(room_idx + 1).is_some() {
-                let next_room = rooms[room_idx + 1].clone();
-                agent.room_idx += 1;
-                let mut found_spawn = false;
-                for (i, cell) in next_room.cells.iter().enumerate() {
-                    if let EscapeRoomCell::Spawn(spawn_agent_idx) = cell
-                    && *spawn_agent_idx == acting_agent_idx {
-                        agent.x = i % next_room.width;
-                        agent.y = i / next_room.width;
-                        found_spawn = true;
-                        break;
+        EscapeRoomCell::Exit(agent_idxs) => {
+            if agent_idxs.len() == n_agents {
+                if rooms.get(room_idx + 1).is_some() {
+                    let next_room = rooms[room_idx + 1].clone();
+                    expected_agent.room_idx += 1;
+                    let mut found_spawn = false;
+                    for (i, cell) in next_room.cells.iter().enumerate() {
+                        if let EscapeRoomCell::Spawn(spawn_agent_idx) = cell
+                        && *spawn_agent_idx == acting_agent_idx {
+                            expected_agent.x = i % next_room.width;
+                            expected_agent.y = i / next_room.width;
+                            found_spawn = true;
+                            break;
+                        }
+                    }
+                    if !found_spawn { panic!("spawn not found"); }
+                } else {
+                    expected_agent.finished = true;
+                }
+            } else {
+                for cell in &mut expected_room.cells {
+                    if let EscapeRoomCell::Exit(agent_idxs) = cell {
+                        agent_idxs.insert(acting_agent_idx);
                     }
                 }
-                if !found_spawn { panic!("spawn not found"); }
-            } else {
-                agent.finished = true;
             }
+            
         }
         _ => {}
     }
+
+    (expected_agent, expected_rooms)
 }
 
 pub fn check_escaperoom_next_state(old_state: &State, new_state: &State, input: &EscapeRoomInput) {
@@ -92,20 +107,20 @@ pub fn check_escaperoom_next_state(old_state: &State, new_state: &State, input: 
         return;
     }
 
-    let mut rooms = old_state.rooms.clone();
+    let mut expected_rooms = old_state.rooms.clone();
 
     for action in &input.actions {
         match action {
             EscapeRoomAction::Move { direction } => {
-                escaperoom_move(&mut expected_agent, &rooms, direction);
+                expected_agent = escaperoom_move(&expected_agent, &expected_rooms, direction);
             }
             EscapeRoomAction::Interact { direction } => {
-                escaperoom_interact(&mut expected_agent, acting_agent_idx, &mut rooms, direction);
+                (expected_agent, expected_rooms) = escaperoom_interact(&expected_agent, &expected_rooms, acting_agent_idx, old_state.agents.len(), direction);
             }
         }
     }
 
-    assert_eq!(new_state.rooms, rooms);
+    assert_eq!(new_state.rooms, expected_rooms);
     for (i, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
         let expected = if i == acting_agent_idx { &expected_agent } else { &old_agent.escape_room };
         assert_eq!(new_agent.escape_room.room_idx, expected.room_idx);
