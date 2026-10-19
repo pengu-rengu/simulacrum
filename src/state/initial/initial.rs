@@ -46,6 +46,13 @@ fn room_from_str(name: &str, s: &str) -> Room {
     }
 }
 
+pub fn initial_room(room_idx: usize) -> Room {
+    match room_idx {
+        0 => room_from_str("Room1", ROOM1),
+        _ => panic!("invalid room index"),
+    }
+}
+
 fn initial_agent(name: &str, x: usize, y: usize) -> Agent {
     Agent {
         name: name.to_string(),

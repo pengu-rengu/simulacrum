@@ -118,33 +118,69 @@ fn mock_states() -> Vec<State> {
             ])
         }
     ];
+    // reset is only well-defined for a single room, so these pairs stay off the shared cycle
+    let reset_pair = state(0, vec![
+        agent("Agent0", 1, 0, None, vec![]),
+        agent("Agent1", 2, 1, None, vec![])
+    ]);
+    let mut farther = agent("Agent1", 2, 1, None, vec![]);
+    farther.escape_room.room_idx = 2;
+    let farther_state = state(0, vec![
+        agent("Agent0", 1, 0, None, vec![]),
+        farther
+    ]);
+    let mut finished_other = agent("Agent0", 1, 0, None, vec![]);
+    finished_other.escape_room.finished = true;
+    let unfinished_turn = state(1, vec![
+        finished_other,
+        agent("Agent1", 2, 1, None, vec![])
+    ]);
+    let mut finished_acting = agent("Agent0", 1, 0, None, vec![]);
+    finished_acting.escape_room.finished = true;
+    let finished_turn = state(0, vec![
+        finished_acting,
+        agent("Agent1", 2, 1, None, vec![])
+    ]);
     base_states.into_iter()
         .flat_map(|state| std::iter::repeat_n(state, input_count))
+        .chain([reset_pair.clone(), reset_pair.clone(), reset_pair, farther_state, unfinished_turn, finished_turn])
         .collect()
 }
 
 fn mock_input_strs() -> Vec<String> {
     let base_inputs = vec![
-        serde_json::json!({ "EscapeRoomInput": { "actions": [], "send_message": null } }).to_string(),
-        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Move": { "direction": "Right" } }], "send_message": null } }).to_string(),
-        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Move": { "direction": "Left" } }], "send_message": null } }).to_string(),
-        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Move": { "direction": "Up" } }], "send_message": null } }).to_string(),
-        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Move": { "direction": "Down" } }], "send_message": null } }).to_string(),
-        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Interact": { "direction": "Right" } }], "send_message": null } }).to_string(),
-        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Interact": { "direction": "Left" } }], "send_message": null } }).to_string(),
-        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Interact": { "direction": "Up" } }], "send_message": null } }).to_string(),
-        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Interact": { "direction": "Down" } }], "send_message": null } }).to_string(),
-        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Interact": { "direction": "Left" } }, { "Move": { "direction": "Left" } }], "send_message": null } }).to_string(),
-        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Move": { "direction": "Right" } }], "send_message": "hello" } }).to_string(),
-        serde_json::json!({ "EscapeRoomInput": { "actions": [], "send_message": "multi\nline" } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [], "send_message": null, "reset": false } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Move": { "direction": "Right" } }], "send_message": null, "reset": false } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Move": { "direction": "Left" } }], "send_message": null, "reset": false } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Move": { "direction": "Up" } }], "send_message": null, "reset": false } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Move": { "direction": "Down" } }], "send_message": null, "reset": false } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Interact": { "direction": "Right" } }], "send_message": null, "reset": false } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Interact": { "direction": "Left" } }], "send_message": null, "reset": false } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Interact": { "direction": "Up" } }], "send_message": null, "reset": false } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Interact": { "direction": "Down" } }], "send_message": null, "reset": false } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Interact": { "direction": "Left" } }, { "Move": { "direction": "Left" } }], "send_message": null, "reset": false } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Move": { "direction": "Right" } }], "send_message": "hello", "reset": false } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [], "send_message": "multi\nline", "reset": false } }).to_string(),
         "".to_string(),
         "not json".to_string(),
         serde_json::json!({ "NodeworldInput": { "action": null, "send_message": null } }).to_string()
     ];
     assert_eq!(base_inputs.len(), 15);
-    (0..mock_states().len())
+    let reset_inputs = vec![
+        serde_json::json!({ "EscapeRoomInput": { "actions": [], "send_message": null, "reset": true } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Move": { "direction": "Right" } }], "send_message": null, "reset": true } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [], "send_message": "back", "reset": true } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [], "send_message": null, "reset": true } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [], "send_message": null, "reset": true } }).to_string(),
+        serde_json::json!({ "EscapeRoomInput": { "actions": [{ "Move": { "direction": "Right" } }], "send_message": "still here", "reset": true } }).to_string()
+    ];
+    let repeated_len = mock_states().len() - reset_inputs.len();
+    let inputs: Vec<String> = (0..repeated_len)
         .map(|i| base_inputs[i % base_inputs.len()].clone())
-        .collect()
+        .chain(reset_inputs)
+        .collect();
+    assert_eq!(inputs.len(), mock_states().len());
+    inputs
 }
 
 pub fn check() {

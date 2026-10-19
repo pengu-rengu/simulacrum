@@ -30,7 +30,8 @@ pub enum EscapeRoomAction {
 #[derive(Deserialize)]
 pub struct EscapeRoomInput {
     pub actions: Vec<EscapeRoomAction>,
-    pub send_message: Option<String>
+    pub send_message: Option<String>,
+    pub reset: bool
 }
 
 

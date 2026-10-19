@@ -1,7 +1,9 @@
+use std::cmp::min;
 use std::iter::zip;
 
 use crate::state::agent::EscapeRoomAgent;
 use crate::state::escaperoom::{EscapeRoomAction, EscapeRoomCell, EscapeRoomInput, Room};
+use crate::state::initial::initial::initial_room;
 use crate::state::state::{Message, State};
 use crate::state::escaperoom::Direction;
 
@@ -28,6 +30,16 @@ fn passable(cell: &EscapeRoomCell) -> bool {
         EscapeRoomCell::Exit(_) => true,
         EscapeRoomCell::Spawn(_) => true
     }
+}
+
+pub fn find_spawn(room: &Room, agent_idx: usize) -> (usize, usize) {
+    for (i, cell) in room.cells.iter().enumerate() {
+        if let EscapeRoomCell::Spawn(spawn_agent_idx) = cell
+        && *spawn_agent_idx == agent_idx {
+            return (i % room.width, i / room.width);
+        }
+    }
+    panic!("spawn not found");
 }
 
 fn escaperoom_move(agent: &EscapeRoomAgent, rooms: &[Room], direction: &Direction) -> EscapeRoomAgent {
@@ -97,6 +109,28 @@ fn escaperoom_interact(agent: &EscapeRoomAgent, rooms: &[Room], acting_agent_idx
     (expected_agent, expected_rooms)
 }
 
+pub fn escaperoom_reset(old_state: &State, new_state: &State) {
+    let mut min_room_idx = usize::MAX;
+    for agent in &old_state.agents {
+        min_room_idx = min(min_room_idx, agent.escape_room.room_idx);
+    }
+
+    assert_eq!(new_state.rooms.len(), old_state.rooms.len());
+    for (i, room) in new_state.rooms[min_room_idx..].iter().enumerate() {
+        assert_eq!(*room, initial_room(min_room_idx + i));
+    }
+    
+    for (i, (old_agent, new_agent)) in zip(&old_state.agents, &new_state.agents).enumerate() {
+        if old_agent.escape_room.finished {
+            continue;
+        }
+        let (spawn_x, spawn_y) = find_spawn(&new_state.rooms[new_agent.escape_room.room_idx], i);
+        assert_eq!(new_agent.escape_room.room_idx, min_room_idx);
+        assert_eq!(new_agent.escape_room.x, spawn_x);
+        assert_eq!(new_agent.escape_room.y, spawn_y);
+    }
+}
+
 pub fn check_escaperoom_next_state(old_state: &State, new_state: &State, input: &EscapeRoomInput) {
     let acting_agent_idx = old_state.agent_idx;
     let mut expected_agent = old_state.agents[acting_agent_idx].escape_room.clone();
@@ -108,6 +142,16 @@ pub fn check_escaperoom_next_state(old_state: &State, new_state: &State, input: 
     }
 
     let mut expected_rooms = old_state.rooms.clone();
+
+    if input.reset {
+        escaperoom_reset(old_state, new_state);
+        if let Some(message) = &input.send_message {
+            check_send_escaperoom_message(old_state, new_state, message);
+        } else {
+            check_escaperoom_message_unchanged(old_state, new_state);
+        }
+        return;
+    }
 
     for action in &input.actions {
         match action {

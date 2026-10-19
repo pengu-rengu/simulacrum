@@ -1,4 +1,5 @@
 use crate::state::escaperoom::{EscapeRoomAction, EscapeRoomCell, Room};
+use crate::state::initial::initial::initial_room;
 use crate::state::state::{State, Input, NodeworldAction, Message, Item, ItemStack, PointOfInterest, DepositType, Menu, CombatEncounter, ToolAttribute, Direction, Universe};
 use serde_json::from_str;
 
@@ -186,6 +187,23 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                 Input::EscapeRoomInput(_) if curr_agent.escape_room.finished => {}
                 Input::EscapeRoomInput(input) => {
                     new_state.agents[curr_agent_idx].error_message = None;
+                    if input.reset {
+                        let min_room_idx = new_state.agents.iter().map(|agent| agent.escape_room.room_idx).min().unwrap();
+                        for idx in min_room_idx..new_state.rooms.len() {
+                            new_state.rooms[idx] = initial_room(idx);
+                        }
+                        for i in 0..new_state.agents.len() {
+                            if new_state.agents[i].escape_room.finished { continue; }
+                            let (x, y) = {
+                                let room = &new_state.rooms[min_room_idx];
+                                let spawn = room.cells.iter().position(|cell| matches!(cell, EscapeRoomCell::Spawn(idx) if *idx == i)).unwrap_or_else(|| panic!("spawn not found"));
+                                (spawn % room.width, spawn / room.width)
+                            };
+                            let escape_room = &mut new_state.agents[i].escape_room;
+                            escape_room.room_idx = min_room_idx;
+                            (escape_room.x, escape_room.y) = (x, y);
+                        }
+                    } else {
                     let mut room_idx = curr_agent.escape_room.room_idx;
                     let mut x = curr_agent.escape_room.x;
                     let mut y = curr_agent.escape_room.y;
@@ -197,13 +215,8 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                             Direction::Left => (x.saturating_sub(1), y),
                             Direction::Right => (x + 1, y)
                         };
-                        if next_x >= room.width || next_y >= room.height {
-                            (x, y)
-                        } else {
-                            (next_x, next_y)
-                        }
+                        if next_x >= room.width || next_y >= room.height { (x, y) } else { (next_x, next_y) }
                     };
-
                     for action in &input.actions {
                         match action {
                             EscapeRoomAction::Move { direction } => {
@@ -267,7 +280,7 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                     new_state.agents[curr_agent_idx].escape_room.x = x;
                     new_state.agents[curr_agent_idx].escape_room.y = y;
                     new_state.agents[curr_agent_idx].escape_room.finished = finished;
-
+                    }
                     if let Some(content) = input.send_message {
                         for agent in &mut new_state.agents {
                             agent.escape_room.messages_inbox.push(Message {
@@ -288,17 +301,12 @@ pub fn next_state(state: &State, input_str: &str) -> State {
             let in_combat = state.nodes.iter()
                 .flat_map(|node| &node.combat_encounters)
                 .any(|CombatEncounter::Pve { agent_idxs, .. }| agent_idxs.contains(&curr_agent_idx));
-
             let result: Result<(), String> = match input.action {
                 Some(NodeworldAction::MoveTo(_)) | Some(NodeworldAction::Harvest { .. }) | Some(NodeworldAction::Inspect { .. }) | Some(NodeworldAction::Engage { .. })
-                    if curr_agent.nodeworld.open_menu.is_some() =>
+                    if curr_agent.nodeworld.open_menu.is_some() || in_combat =>
                 {
-                    Err("you cannot do that while a menu is open".to_string())
-                }
-                Some(NodeworldAction::MoveTo(_)) | Some(NodeworldAction::Harvest { .. }) | Some(NodeworldAction::Inspect { .. }) | Some(NodeworldAction::Engage { .. })
-                    if in_combat =>
-                {
-                    Err("you cannot do that while in combat".to_string())
+                    let blocked = if curr_agent.nodeworld.open_menu.is_some() { "you cannot do that while a menu is open" } else { "you cannot do that while in combat" };
+                    Err(blocked.to_string())
                 }
                 Some(NodeworldAction::MoveTo(node_name)) => {
                     match state.nodes.iter().position(|node| node.name == node_name) {
@@ -316,13 +324,11 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                     let PointOfInterest::ResourceDeposit { type_, exposed, stability, reserves, yield_, .. } = poi else {
                         break 'harvest Err("cannot harvest this poi".to_string());
                     };
-
                     // swings are simulated on a copy; the deposit itself never changes
                     let (mut exposed, mut stability, mut reserves) = (*exposed, *stability, *reserves);
                     let mut total_yield = 0;
                     let mut tool_uses = vec![0; curr_agent.nodeworld.inventory.len()];
                     let mut collapsed = false;
-
                     for tool_idx in tool_idxs {
                         let tool = match tool_idx {
                             None => None,
@@ -340,7 +346,6 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                             }
                             _ => break 'harvest Err("this tool has no use here".to_string())
                         };
-
                         // chipping moves exposed into yield, drilling moves reserves into exposed;
                         // every unit moved costs a point of stability
                         for (attribute, amount) in attributes {
@@ -363,19 +368,16 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                         if let Some(idx) = tool_idx {
                             tool_uses[idx] += 1;
                         }
-
                         // a collapse wins even on the swing that wears the tool out
                         if stability == 0 {
                             collapsed = true;
                             break;
                         }
-
                         // a tool that runs out of durability ends the harvest
                         if let (Some(idx), Some(durability)) = (tool_idx, durability) {
                             if tool_uses[idx] >= durability { break; }
                         }
                     }
-
                     let inventory = &mut new_state.agents[curr_agent_idx].nodeworld.inventory;
                     for (item_stack, uses) in inventory.iter_mut().zip(&tool_uses) {
                         if let Item::Tool { durability, .. } = &mut item_stack.item {
@@ -393,7 +395,6 @@ pub fn next_state(state: &State, input_str: &str) -> State {
                     inventory.retain(|item_stack| {
                         item_stack.count > 0 && !matches!(item_stack.item, Item::Tool { durability: 0, .. })
                     });
-
                     if collapsed { Err("deposit collapsed".to_string()) } else { Ok(()) }
                 }
                 Some(NodeworldAction::Inspect { poi_idx }) => {
